@@ -6,7 +6,6 @@ import { useCards } from '@/hooks/useCards';
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AccountsScreen() {
   const [activeTab, setActiveTab] = useState<'accounts' | 'cards'>('accounts');
@@ -32,12 +32,12 @@ export default function AccountsScreen() {
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Cuentas y Tarjetas</Text>
+        <Text style={styles.title}>Estado Bancario</Text>
         <LogoutButton />
       </View>
 
       <View style={styles.balanceSection}>
-        <Text style={styles.balanceLabel}>Saldo Total</Text>
+        <Text style={styles.balanceLabel}>Saldo Total Disponible</Text>
         <Text style={styles.balanceAmount}>{formatCurrency(totalBalance)}</Text>
       </View>
 
@@ -47,7 +47,7 @@ export default function AccountsScreen() {
           onPress={() => setActiveTab('accounts')}
         >
           <Text style={[styles.tabText, activeTab === 'accounts' && styles.activeTabText]}>
-            Cuentas y Tarjetas
+            Cuentas
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

@@ -5,7 +5,6 @@ import { mockBudgets } from '@/constants/mockData';
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function BudgetsScreen() {
   const [activeTab, setActiveTab] = useState<'budgets' | 'goals'>('budgets');
@@ -25,7 +25,7 @@ export default function BudgetsScreen() {
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Presupuestos y Metas</Text>
+        <Text style={styles.title}>Presupuestos</Text>
         <LogoutButton />
       </View>
 
@@ -54,7 +54,7 @@ export default function BudgetsScreen() {
           <>
             {/* Summary Card */}
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Total Gastado este Mes</Text>
+              <Text style={styles.summaryLabel}>Total Gastado Por Mes</Text>
               <Text style={styles.summaryAmount}>€{totalSpent.toFixed(0)} / €{totalBudget.toFixed(0)}</Text>
               <Text style={styles.summarySubtext}>
                 {((totalSpent / totalBudget) * 100).toFixed(0)}% del presupuesto para esta mes
