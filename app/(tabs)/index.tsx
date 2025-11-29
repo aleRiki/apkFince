@@ -47,12 +47,24 @@ export default function HomeScreen() {
   const [weeklyChange, setWeeklyChange] = useState(0);
 
   useEffect(() => {
+    // Initial fetch
     fetchData();
+
+    // Set up interval to fetch data every 30 seconds for real-time updates
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 30000); // 30 seconds
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
   }, []);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
+      // Only show loading on initial fetch
+      if (accounts.length === 0) {
+        setLoading(true);
+      }
 
       // Fetch accounts
       const accountsData = await api.get('/api/v1/accounts');
