@@ -1,5 +1,6 @@
 import AccountCard from '@/components/AccountCard';
 import BudgetProgress from '@/components/BudgetProgress';
+import LogoutButton from '@/components/LogoutButton';
 import TransactionItem from '@/components/TransactionItem';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { mockBudgets } from '@/constants/mockData';
@@ -11,7 +12,6 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Account {
   id: number;
@@ -40,7 +41,7 @@ interface Transaction {
 }
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,11 +129,6 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push('/auth/login');
-  };
-
   // Calculate total balance from real accounts
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
@@ -177,17 +173,20 @@ export default function HomeScreen() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hola, {user?.name || 'Usuario'}</Text>
-            <Text style={styles.subtitle}>Panel de Control Familiar</Text>
+          <View style={styles.userInfo}>
+            <View style={styles.avatarContainer}>
+              <Feather name="user" size={24} color={appTheme.colors.primary} />
+            </View>
+            <View style={styles.userDetails}>
+              <Text style={styles.userEmail}>{user?.email || 'usuario@email.com'}</Text>
+              <Text style={styles.subtitle}>Panel de Control Familiar</Text>
+            </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.iconButton}>
               <Feather name="bell" size={22} color={appTheme.colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
-              <Feather name="log-out" size={22} color={appTheme.colors.text} />
-            </TouchableOpacity>
+            <LogoutButton />
           </View>
         </View>
 
@@ -374,9 +373,26 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
   },
-  greeting: {
-    fontSize: 28,
-    fontWeight: '900',
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: appTheme.colors.backgroundCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userEmail: {
+    fontSize: 16,
+    fontWeight: '700',
     color: appTheme.colors.text,
   },
   subtitle: {

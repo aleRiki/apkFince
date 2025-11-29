@@ -1,16 +1,17 @@
 import BudgetProgress from '@/components/BudgetProgress';
+import LogoutButton from '@/components/LogoutButton';
 import { appTheme } from '@/constants/appTheme';
 import { mockBudgets } from '@/constants/mockData';
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function BudgetsScreen() {
@@ -22,9 +23,10 @@ export default function BudgetsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
-      
+
       <View style={styles.header}>
         <Text style={styles.title}>Presupuestos y Metas</Text>
+        <LogoutButton />
       </View>
 
       {/* Tabs */}
@@ -79,7 +81,7 @@ export default function BudgetsScreen() {
         {activeTab === 'goals' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tus Metas de Ahorro</Text>
-            
+
             {/* Mock Goals */}
             <View style={styles.goalCard}>
               <View style={styles.goalHeader}>
@@ -134,6 +136,9 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
