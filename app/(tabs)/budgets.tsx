@@ -64,6 +64,7 @@ export default function BudgetsScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<{ name: string, budget: number, id: string } | null>(null);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
+  const [globalBudget, setGlobalBudget] = useState<number | null>(null);
 
   const fetchTransactions = async () => {
     try {
@@ -92,10 +93,6 @@ export default function BudgetsScreen() {
   };
 
   const calculateBudgets = (expenses: Transaction[]) => {
-    // We need to preserve the current budget limits, so we map over the CURRENT state 'budgets'
-    // instead of INITIAL_BUDGETS, but we need to be careful not to double count if we re-run this.
-    // Actually, to be safe and simple: use current budgets state for limits, but reset spent to 0 first.
-
     setBudgets(prevBudgets => {
       const newBudgets = prevBudgets.map(b => ({ ...b, spent: 0 }));
 
@@ -136,11 +133,25 @@ export default function BudgetsScreen() {
     setEditModalVisible(true);
   };
 
+  const handleGlobalBudgetPress = () => {
+    const currentTotal = budgets.reduce((sum, b) => sum + b.budget, 0);
+    setSelectedBudget({
+      id: 'global',
+      name: 'Presupuesto Total Mensual',
+      budget: globalBudget !== null ? globalBudget : currentTotal
+    });
+    setEditModalVisible(true);
+  };
+
   const handleUpdateBudget = (newLimit: number) => {
     if (selectedBudget) {
-      setBudgets(prev => prev.map(b =>
-        b.id === selectedBudget.id ? { ...b, budget: newLimit } : b
-      ));
+      if (selectedBudget.id === 'global') {
+        setGlobalBudget(newLimit);
+      } else {
+        setBudgets(prev => prev.map(b =>
+          b.id === selectedBudget.id ? { ...b, budget: newLimit } : b
+        ));
+      }
     }
   };
 
@@ -150,7 +161,8 @@ export default function BudgetsScreen() {
     }, [])
   );
 
-  const totalBudget = budgets.reduce((sum, b) => sum + b.budget, 0);
+  const sumOfBudgets = budgets.reduce((sum, b) => sum + b.budget, 0);
+  const totalBudget = globalBudget !== null ? globalBudget : sumOfBudgets;
   const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   // Calculate progress for the summary card
@@ -189,7 +201,11 @@ export default function BudgetsScreen() {
         {activeTab === 'budgets' && (
           <>
             {/* Summary Card */}
-            <View style={styles.summaryCard}>
+            <TouchableOpacity
+              style={styles.summaryCard}
+              activeOpacity={0.8}
+              onPress={handleGlobalBudgetPress}
+            >
               <Text style={styles.summaryLabel}>Total Gastado Por Mes</Text>
               <Text style={styles.summaryAmount}>
                 {formatCurrency(totalSpent)} / {formatCurrency(totalBudget)}
@@ -197,7 +213,10 @@ export default function BudgetsScreen() {
               <Text style={styles.summarySubtext}>
                 {progressPercentage.toFixed(0)}% del presupuesto para este mes
               </Text>
-            </View>
+              {globalBudget === null && (
+                <Text style={styles.hintText}>(Toca para definir presupuesto global)</Text>
+              )}
+            </TouchableOpacity>
 
             {/* Presupuestos List */}
             <View style={styles.section}>
@@ -409,6 +428,12 @@ const styles = StyleSheet.create({
   summarySubtext: {
     fontSize: 13,
     color: appTheme.colors.textSecondary,
+  },
+  hintText: {
+    fontSize: 12,
+    color: appTheme.colors.textSecondary,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   section: {
     paddingHorizontal: 20,
