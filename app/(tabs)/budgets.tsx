@@ -1,10 +1,13 @@
-import BudgetProgress from '@/components/BudgetProgress';
+import CreateTransactionModal from '@/components/CreateTransactionModal';
 import LogoutButton from '@/components/LogoutButton';
-import { appTheme } from '@/constants/appTheme';
+import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { mockBudgets } from '@/constants/mockData';
+import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,11 +17,101 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Mapping from API categories to Mock Budget categories
+const CATEGORY_MAPPING: Record<string, string> = {
+  'food_groceries': 'comida',
+  'transportation': 'transporte',
+  'entertainment': 'ocio',
+  'rent': 'hogar',
+  'utilities_electricity': 'hogar',
+  'utilities_phone': 'hogar',
+  'utilities_internet': 'hogar',
+  'shopping': 'comida', // Mapping shopping to food/general for now or maybe create a new budget?
+};
+
+interface Transaction {
+  id: number;
+  transactionType: string;
+  amount: number;
+  description: string;
+  category: string;
+  date: string;
+}
+
 export default function BudgetsScreen() {
   const [activeTab, setActiveTab] = useState<'budgets' | 'goals'>('budgets');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [budgets, setBudgets] = useState(mockBudgets);
 
-  const totalBudget = mockBudgets.reduce((sum, b) => sum + b.budget, 0);
-  const totalSpent = mockBudgets.reduce((sum, b) => sum + b.spent, 0);
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true);
+      const data = await api.get('/api/v1/transaction');
+
+      // Filter only expenses (withdraw)
+      const expenses = data
+        .filter((tx: any) => tx.transactionType === 'withdraw')
+        .map((tx: any) => ({
+          id: tx.id,
+          transactionType: tx.transactionType,
+          amount: parseFloat(tx.amount),
+          description: tx.description || tx.notes || 'Gasto',
+          category: tx.category,
+          date: tx.date,
+        }));
+
+      setTransactions(expenses);
+      calculateBudgets(expenses);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateBudgets = (expenses: Transaction[]) => {
+    // Reset spent amounts
+    const newBudgets = mockBudgets.map(b => ({ ...b, spent: 0 }));
+
+    expenses.forEach(tx => {
+      const budgetCategory = CATEGORY_MAPPING[tx.category];
+      if (budgetCategory) {
+        const budgetIndex = newBudgets.findIndex(b => b.category === budgetCategory);
+        if (budgetIndex !== -1) {
+          newBudgets[budgetIndex].spent += tx.amount;
+        }
+      }
+    });
+
+    setBudgets(newBudgets);
+  };
+
+  const handleCreateTransaction = async (transactionData: any) => {
+    try {
+      await api.post('/api/v1/transaction', transactionData);
+      // Refresh data
+      fetchTransactions();
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      alert('Error al crear la transacción');
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTransactions();
+    }, [])
+  );
+
+  const totalBudget = budgets.reduce((sum, b) => sum + b.budget, 0);
+  const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
+
+  // Calculate progress for the summary card
+  // Note: totalSpent might exceed totalBudget if there are expenses not in budgets, 
+  // but for the visual we might want to cap it or show the real percentage.
+  const progressPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -55,25 +148,78 @@ export default function BudgetsScreen() {
             {/* Summary Card */}
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Total Gastado Por Mes</Text>
-              <Text style={styles.summaryAmount}>€{totalSpent.toFixed(0)} / €{totalBudget.toFixed(0)}</Text>
+              <Text style={styles.summaryAmount}>
+                {formatCurrency(totalSpent)} / {formatCurrency(totalBudget)}
+              </Text>
               <Text style={styles.summarySubtext}>
-                {((totalSpent / totalBudget) * 100).toFixed(0)}% del presupuesto para esta mes
+                {progressPercentage.toFixed(0)}% del presupuesto para este mes
               </Text>
             </View>
 
             {/* Presupuestos List */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tus Presupuestos</Text>
-              {mockBudgets.map(budget => (
-                <BudgetProgress
-                  key={budget.id}
-                  category={budget.category}
-                  name={budget.name}
-                  spent={budget.spent}
-                  budget={budget.budget}
-                  icon={budget.icon}
-                />
-              ))}
+              {loading ? (
+                <ActivityIndicator color={appTheme.colors.primary} />
+              ) : (
+                budgets.map(budget => {
+                  const percent = Math.min((budget.spent / budget.budget) * 100, 100);
+                  let color = appTheme.colors.success;
+                  if (percent > 80) color = appTheme.colors.warning;
+                  if (percent >= 100) color = appTheme.colors.error;
+
+                  return (
+                    <View key={budget.id} style={styles.budgetCard}>
+                      <View style={styles.budgetHeader}>
+                        <View style={styles.budgetIconContainer}>
+                          {/* We can use a mapping for icons or keep using what's in mockBudgets if compatible */}
+                          <Feather name="pie-chart" size={24} color={color} />
+                        </View>
+                        <View style={styles.budgetInfo}>
+                          <Text style={styles.budgetName}>{budget.name}</Text>
+                          <Text style={styles.budgetAmount}>
+                            {formatCurrency(budget.spent)} / {formatCurrency(budget.budget)}
+                          </Text>
+                        </View>
+                        <View style={[styles.percentBadge, { backgroundColor: `${color}20` }]}>
+                          <Text style={[styles.percentText, { color: color }]}>
+                            {percent.toFixed(0)}%
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${percent}%`, backgroundColor: color }
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+
+            {/* Recent Expenses List */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Últimos Gastos</Text>
+              {transactions.length === 0 ? (
+                <Text style={styles.emptyText}>No hay gastos registrados</Text>
+              ) : (
+                transactions.slice(0, 5).map(tx => (
+                  <View key={tx.id} style={styles.transactionItem}>
+                    <View style={styles.transactionIcon}>
+                      <Feather name="arrow-down-circle" size={24} color={appTheme.colors.error} />
+                    </View>
+                    <View style={styles.transactionContent}>
+                      <Text style={styles.transactionTitle}>{tx.description}</Text>
+                      <Text style={styles.transactionCategory}>{tx.category}</Text>
+                    </View>
+                    <Text style={styles.transactionAmount}>-{formatCurrency(tx.amount)}</Text>
+                  </View>
+                ))
+              )}
             </View>
           </>
         )}
@@ -121,11 +267,21 @@ export default function BudgetsScreen() {
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => setModalVisible(true)}
+      >
         <View style={styles.fabContent}>
           <Feather name="plus" size={28} color="#FFF" />
         </View>
       </TouchableOpacity>
+
+      <CreateTransactionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleCreateTransaction}
+      />
     </SafeAreaView>
   );
 }
@@ -201,12 +357,65 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: appTheme.colors.text,
     marginBottom: 12,
+  },
+  budgetCard: {
+    backgroundColor: appTheme.colors.backgroundCard,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  budgetIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  budgetInfo: {
+    flex: 1,
+  },
+  budgetName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: appTheme.colors.text,
+    marginBottom: 2,
+  },
+  budgetAmount: {
+    fontSize: 13,
+    color: appTheme.colors.textSecondary,
+  },
+  percentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  percentText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   goalCard: {
     backgroundColor: appTheme.colors.backgroundCard,
@@ -241,18 +450,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: appTheme.colors.textSecondary,
   },
-  progressBar: {
-    height: 8,
-    backgroundColor: 'rgba(148, 163, 184, 0.2)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: appTheme.colors.success,
-    borderRadius: 4,
-  },
   goalProgress: {
     fontSize: 12,
     color: appTheme.colors.textSecondary,
@@ -272,5 +469,45 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emptyText: {
+    color: appTheme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: appTheme.colors.backgroundCard,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  transactionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  transactionContent: {
+    flex: 1,
+  },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: appTheme.colors.text,
+  },
+  transactionCategory: {
+    fontSize: 13,
+    color: appTheme.colors.textSecondary,
+    textTransform: 'capitalize',
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: appTheme.colors.error,
   },
 });
