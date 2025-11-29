@@ -1,7 +1,7 @@
 import CreateTransactionModal from '@/components/CreateTransactionModal';
+import EditBudgetModal from '@/components/EditBudgetModal';
 import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
-import { mockBudgets } from '@/constants/mockData';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -17,16 +17,34 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Mapping from API categories to Mock Budget categories
+// Initial budgets configuration matching user requirements
+const INITIAL_BUDGETS = [
+  { id: '1', category: 'rent', name: 'Alquiler', spent: 0, budget: 800, icon: 'home' },
+  { id: '2', category: 'food_groceries', name: 'Comida', spent: 0, budget: 400, icon: 'shopping-cart' },
+  { id: '3', category: 'entertainment', name: 'Entretenimiento', spent: 0, budget: 150, icon: 'film' },
+  { id: '4', category: 'transportation', name: 'Transporte', spent: 0, budget: 100, icon: 'truck' },
+  { id: '5', category: 'utilities_internet', name: 'Internet', spent: 0, budget: 50, icon: 'wifi' },
+  { id: '6', category: 'utilities_electricity', name: 'Electricidad', spent: 0, budget: 80, icon: 'zap' },
+  { id: '7', category: 'utilities_phone', name: 'Teléfono', spent: 0, budget: 40, icon: 'phone' },
+  { id: '8', category: 'shopping', name: 'Compras', spent: 0, budget: 200, icon: 'shopping-bag' },
+  { id: '9', category: 'health_care', name: 'Salud', spent: 0, budget: 100, icon: 'heart' },
+  { id: '10', category: 'debt_payment', name: 'Deudas', spent: 0, budget: 300, icon: 'credit-card' },
+  { id: '11', category: 'other_expense', name: 'Otros', spent: 0, budget: 100, icon: 'more-horizontal' },
+];
+
+// Direct mapping since we are now using the API category keys directly in our budgets
 const CATEGORY_MAPPING: Record<string, string> = {
-  'food_groceries': 'comida',
-  'transportation': 'transporte',
-  'entertainment': 'ocio',
-  'rent': 'hogar',
-  'utilities_electricity': 'hogar',
-  'utilities_phone': 'hogar',
-  'utilities_internet': 'hogar',
-  'shopping': 'comida', // Mapping shopping to food/general for now or maybe create a new budget?
+  'rent': 'rent',
+  'food_groceries': 'food_groceries',
+  'entertainment': 'entertainment',
+  'transportation': 'transportation',
+  'utilities_electricity': 'utilities_electricity',
+  'utilities_phone': 'utilities_phone',
+  'utilities_internet': 'utilities_internet',
+  'debt_payment': 'debt_payment',
+  'health_care': 'health_care',
+  'shopping': 'shopping',
+  'other_expense': 'other_expense',
 };
 
 interface Transaction {
@@ -43,7 +61,9 @@ export default function BudgetsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [budgets, setBudgets] = useState(mockBudgets);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<{ name: string, budget: number, id: string } | null>(null);
+  const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
 
   const fetchTransactions = async () => {
     try {
@@ -72,20 +92,28 @@ export default function BudgetsScreen() {
   };
 
   const calculateBudgets = (expenses: Transaction[]) => {
-    // Reset spent amounts
-    const newBudgets = mockBudgets.map(b => ({ ...b, spent: 0 }));
+    // We need to preserve the current budget limits, so we map over the CURRENT state 'budgets'
+    // instead of INITIAL_BUDGETS, but we need to be careful not to double count if we re-run this.
+    // Actually, to be safe and simple: use current budgets state for limits, but reset spent to 0 first.
 
-    expenses.forEach(tx => {
-      const budgetCategory = CATEGORY_MAPPING[tx.category];
-      if (budgetCategory) {
-        const budgetIndex = newBudgets.findIndex(b => b.category === budgetCategory);
+    setBudgets(prevBudgets => {
+      const newBudgets = prevBudgets.map(b => ({ ...b, spent: 0 }));
+
+      expenses.forEach(tx => {
+        const budgetIndex = newBudgets.findIndex(b => b.category === tx.category);
+
         if (budgetIndex !== -1) {
           newBudgets[budgetIndex].spent += tx.amount;
+        } else {
+          const otherIndex = newBudgets.findIndex(b => b.category === 'other_expense');
+          if (otherIndex !== -1) {
+            newBudgets[otherIndex].spent += tx.amount;
+          }
         }
-      }
-    });
+      });
 
-    setBudgets(newBudgets);
+      return newBudgets;
+    });
   };
 
   const handleCreateTransaction = async (transactionData: any) => {
@@ -99,6 +127,23 @@ export default function BudgetsScreen() {
     }
   };
 
+  const handleBudgetPress = (budget: any) => {
+    setSelectedBudget({
+      id: budget.id,
+      name: budget.name,
+      budget: budget.budget
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleUpdateBudget = (newLimit: number) => {
+    if (selectedBudget) {
+      setBudgets(prev => prev.map(b =>
+        b.id === selectedBudget.id ? { ...b, budget: newLimit } : b
+      ));
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchTransactions();
@@ -109,8 +154,6 @@ export default function BudgetsScreen() {
   const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   // Calculate progress for the summary card
-  // Note: totalSpent might exceed totalBudget if there are expenses not in budgets, 
-  // but for the visual we might want to cap it or show the real percentage.
   const progressPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
   return (
@@ -159,6 +202,7 @@ export default function BudgetsScreen() {
             {/* Presupuestos List */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tus Presupuestos</Text>
+              <Text style={styles.sectionSubtitle}>Toca una tarjeta para editar el límite</Text>
               {loading ? (
                 <ActivityIndicator color={appTheme.colors.primary} />
               ) : (
@@ -169,11 +213,15 @@ export default function BudgetsScreen() {
                   if (percent >= 100) color = appTheme.colors.error;
 
                   return (
-                    <View key={budget.id} style={styles.budgetCard}>
+                    <TouchableOpacity
+                      key={budget.id}
+                      style={styles.budgetCard}
+                      activeOpacity={0.7}
+                      onPress={() => handleBudgetPress(budget)}
+                    >
                       <View style={styles.budgetHeader}>
                         <View style={styles.budgetIconContainer}>
-                          {/* We can use a mapping for icons or keep using what's in mockBudgets if compatible */}
-                          <Feather name="pie-chart" size={24} color={color} />
+                          <Feather name={budget.icon as any} size={24} color={color} />
                         </View>
                         <View style={styles.budgetInfo}>
                           <Text style={styles.budgetName}>{budget.name}</Text>
@@ -195,7 +243,7 @@ export default function BudgetsScreen() {
                           ]}
                         />
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
               )}
@@ -282,6 +330,13 @@ export default function BudgetsScreen() {
         onClose={() => setModalVisible(false)}
         onSubmit={handleCreateTransaction}
       />
+
+      <EditBudgetModal
+        visible={editModalVisible}
+        onClose={() => setEditModalVisible(false)}
+        onSubmit={handleUpdateBudget}
+        currentBudget={selectedBudget}
+      />
     </SafeAreaView>
   );
 }
@@ -363,6 +418,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: appTheme.colors.text,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: appTheme.colors.textSecondary,
     marginBottom: 12,
   },
   budgetCard: {
