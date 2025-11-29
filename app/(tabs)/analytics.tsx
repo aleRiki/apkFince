@@ -1,15 +1,16 @@
+import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { mockCategoryExpenses, mockMonthlyData } from '@/constants/mockData';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -28,9 +29,10 @@ export default function AnalyticsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
-      
+
       <View style={styles.header}>
         <Text style={styles.title}>Informes y Análisis</Text>
+        <LogoutButton />
       </View>
 
       {/* Period Tabs */}
@@ -59,7 +61,7 @@ export default function AnalyticsScreen() {
         {/* Period Summary */}
         <View style={styles.summaryCard}>
           <Text style={styles.cardTitle}>Resumen del Período</Text>
-          
+
           <View style={styles.summaryGrid}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Ingresos Totales</Text>
@@ -67,14 +69,14 @@ export default function AnalyticsScreen() {
                 {formatCurrency(totalIncome)}
               </Text>
             </View>
-            
+
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Gastos Totales</Text>
               <Text style={[styles.summaryValue, styles.expenseText]}>
                 {formatCurrency(totalExpenses)}
               </Text>
             </View>
-            
+
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Balance</Text>
               <Text style={[styles.summaryValue, balance >= 0 ? styles.incomeText : styles.expenseText]}>
@@ -87,7 +89,7 @@ export default function AnalyticsScreen() {
         {/* Donut Chart */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Gastos por Categoría</Text>
-          
+
           <View style={styles.donutContainer}>
             <View style={styles.donutChart}>
               {mockCategoryExpenses.map((cat, index) => {
@@ -99,7 +101,7 @@ export default function AnalyticsScreen() {
                 );
               })}
             </View>
-            
+
             <View style={styles.donutCenter}>
               <Text style={styles.donutCenterLabel}>Total</Text>
               <Text style={styles.donutCenterValue}>{formatCurrency(total)}</Text>
@@ -121,14 +123,14 @@ export default function AnalyticsScreen() {
         {/* Bar Chart */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Evolución Mensual</Text>
-          
+
           <View style={styles.barChart}>
             <View style={styles.barChartBars}>
               {mockMonthlyData.map((data, index) => {
                 const maxValue = Math.max(...mockMonthlyData.map(d => Math.max(d.income, d.expense)));
                 const incomeHeight = (data.income / maxValue) * 140;
                 const expenseHeight = (data.expense / maxValue) * 140;
-                
+
                 return (
                   <View key={index} style={styles.barGroup}>
                     <View style={styles.barPair}>
@@ -166,6 +168,9 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,

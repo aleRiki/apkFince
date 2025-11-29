@@ -1,3 +1,4 @@
+import { api } from '@/services/api';
 import React, { createContext, ReactNode, useContext, useState } from 'react';
 
 interface User {
@@ -20,38 +21,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demo purposes, accept any credentials
-    if (email && password) {
-      setUser({
-        id: '1',
-        name: 'Familia',
-        email: email,
-      });
-      return true;
+    try {
+      const response = await api.post('/api/v1/auth/login', { email, password });
+      console.log('Login response:', JSON.stringify(response, null, 2));
+
+      // Extract token from response (assuming it's in 'token' field)
+      const token = response.token;
+      if (token) {
+        api.setToken(token);
+      }
+
+      // Decode token to extract user name if not in response directly
+      const userName = response.name || response.user?.name || 'Usuario';
+
+      if (token) {
+        setUser({
+          id: response.id || response.user?.id || '1',
+          name: userName,
+          email: response.email || email,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
     }
-    return false;
   };
 
   const register = async (name: string, email: string, password: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (name && email && password) {
-      setUser({
-        id: '1',
-        name: name,
-        email: email,
-      });
-      return true;
+    try {
+      const response = await api.post('/api/v1/auth/register', { name, email, password });
+      console.log('Register response:', JSON.stringify(response, null, 2));
+
+      const token = response.token;
+      if (token) {
+        api.setToken(token);
+      }
+
+      const userData = response.user || response;
+
+      if (userData) {
+        setUser({
+          id: userData.id || '1',
+          name: userData.name || name,
+          email: userData.email || email,
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Registration failed:', error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
+    console.log('Logout called - clearing user and token');
     setUser(null);
+    api.setToken(null);
+    console.log('User logged out successfully');
   };
 
   return (

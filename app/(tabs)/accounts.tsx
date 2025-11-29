@@ -1,39 +1,46 @@
-import AccountCard from '@/components/AccountCard';
+import AddCardModal from '@/components/AddCardModal';
+import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
-import { mockAccounts, mockCreditCards } from '@/constants/mockData';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAccounts } from '@/hooks/useAccounts';
+import { useCards } from '@/hooks/useCards';
+import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function AccountsScreen() {
   const [activeTab, setActiveTab] = useState<'accounts' | 'cards'>('accounts');
+  const [modalVisible, setModalVisible] = useState(false);
+  const { accounts, loading } = useAccounts();
+  const { cards, loading: cardsLoading, addCard } = useCards();
 
-  const totalBalance = mockAccounts.reduce((sum, acc) => sum + acc.balance, 0) +
-                      mockCreditCards.reduce((sum, card) => sum + card.balance, 0);
+  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+  const handleAddCard = async (cardNumber: string, accountId: number) => {
+    await addCard({ number: cardNumber, account: accountId });
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
-      
+
       <View style={styles.header}>
         <Text style={styles.title}>Cuentas y Tarjetas</Text>
+        <LogoutButton />
       </View>
 
-      {/* Balance Total */}
       <View style={styles.balanceSection}>
         <Text style={styles.balanceLabel}>Saldo Total</Text>
         <Text style={styles.balanceAmount}>{formatCurrency(totalBalance)}</Text>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'accounts' && styles.activeTab]}
@@ -57,7 +64,7 @@ export default function AccountsScreen() {
         {activeTab === 'accounts' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Cuentas Bancarias</Text>
-            {mockAccounts.map(account => (
+            {accounts.map(account => (
               <View key={account.id} style={styles.listItem}>
                 <View style={styles.listItemIcon}>
                   <Feather name="credit-card" size={24} color={appTheme.colors.primary} />
@@ -71,68 +78,51 @@ export default function AccountsScreen() {
             ))}
 
             <View style={styles.divider} />
-
-            <Text style={styles.sectionTitle}>Otros Activos</Text>
-            <View style={styles.listItem}>
-              <View style={styles.listItemIcon}>
-                <MaterialCommunityIcons name="cash" size={24} color={appTheme.colors.success} />
-              </View>
-              <View style={styles.listItemContent}>
-                <Text style={styles.listItemTitle}>Efectivo</Text>
-                <Text style={styles.listItemSubtitle}>Dinero en mano</Text>
-              </View>
-              <Text style={styles.listItemAmount}>{formatCurrency(1200.00)}</Text>
-            </View>
-
-            <View style={styles.listItem}>
-              <View style={styles.listItemIcon}>
-                <MaterialCommunityIcons name="chart-line" size={24} color={appTheme.colors.info} />
-              </View>
-              <View style={styles.listItemContent}>
-                <Text style={styles.listItemTitle}>Inversiones</Text>
-                <Text style={styles.listItemSubtitle}>Fondo de DGM</Text>
-              </View>
-              <Text style={styles.listItemAmount}>{formatCurrency(13650.00)}</Text>
-            </View>
           </View>
         )}
 
         {activeTab === 'cards' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tarjetas de Crédito</Text>
-            {mockCreditCards.map(card => (
-              <View key={card.id} style={styles.cardContainer}>
-                <AccountCard
-                  name={card.name}
-                  bank={card.bank}
-                  lastDigits={card.lastDigits}
-                  balance={card.balance}
-                  colors={card.color}
-                />
-                <View style={styles.cardDetails}>
-                  <View style={styles.cardDetail}>
-                    <Text style={styles.cardDetailLabel}>Disponible</Text>
-                    <Text style={styles.cardDetailValue}>{formatCurrency(card.balance)}</Text>
+            <Text style={styles.sectionTitle}>Tarjetas</Text>
+            {cardsLoading ? (
+              <Text style={styles.emptyText}>Cargando tarjetas...</Text>
+            ) : cards.length === 0 ? (
+              <Text style={styles.emptyText}>No tienes tarjetas asociadas</Text>
+            ) : (
+              cards.map(card => (
+                <View key={card.id} style={styles.listItem}>
+                  <View style={styles.listItemIcon}>
+                    <Feather name="credit-card" size={24} color={appTheme.colors.accent} />
                   </View>
-                  <View style={styles.cardDetail}>
-                    <Text style={styles.cardDetailLabel}>Límite</Text>
-                    <Text style={styles.cardDetailValue}>{formatCurrency(card.limit)}</Text>
+                  <View style={styles.listItemContent}>
+                    <Text style={styles.listItemTitle}>Tarjeta •••• {card.number.slice(-4)}</Text>
+                    <Text style={styles.listItemSubtitle}>{card.account.name}</Text>
                   </View>
+                  <Feather name="chevron-right" size={20} color={appTheme.colors.textSecondary} />
                 </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => setModalVisible(true)}
+      >
         <View style={styles.fabContent}>
           <Feather name="plus" size={28} color="#FFF" />
         </View>
       </TouchableOpacity>
+
+      <AddCardModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleAddCard}
+      />
     </SafeAreaView>
   );
 }
@@ -143,6 +133,9 @@ const styles = StyleSheet.create({
     backgroundColor: appTheme.colors.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
@@ -209,6 +202,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 8,
   },
+  emptyText: {
+    fontSize: 14,
+    color: appTheme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 20,
+  },
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -248,30 +247,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(148, 163, 184, 0.2)',
     marginVertical: 20,
-  },
-  cardContainer: {
-    marginBottom: 20,
-  },
-  cardDetails: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  cardDetail: {
-    flex: 1,
-    backgroundColor: appTheme.colors.backgroundCard,
-    borderRadius: 12,
-    padding: 16,
-  },
-  cardDetailLabel: {
-    fontSize: 12,
-    color: appTheme.colors.textSecondary,
-    marginBottom: 4,
-  },
-  cardDetailValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: appTheme.colors.text,
   },
   fab: {
     position: 'absolute',
