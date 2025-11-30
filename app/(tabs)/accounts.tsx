@@ -1,8 +1,10 @@
 import AddCardModal from '@/components/AddCardModal';
+import DepositModal from '@/components/DepositModal';
 import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCards } from '@/hooks/useCards';
+import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -18,13 +20,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function AccountsScreen() {
   const [activeTab, setActiveTab] = useState<'accounts' | 'cards'>('accounts');
   const [modalVisible, setModalVisible] = useState(false);
-  const { accounts, loading } = useAccounts();
-  const { cards, loading: cardsLoading, addCard } = useCards();
+  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<any>(null);
+  const { accounts, loading, refetch: refetchAccounts } = useAccounts();
+  const { cards, loading: cardsLoading, addCard, refetch: refetchCards } = useCards();
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
   const handleAddCard = async (cardNumber: string, accountId: number) => {
     await addCard({ number: cardNumber, account: accountId });
+  };
+
+  const handleCardPress = (card: any) => {
+    setSelectedCard(card);
+    setDepositModalVisible(true);
+  };
+
+  const handleDeposit = async (depositData: any) => {
+    try {
+      await api.post('/api/v1/transaction', depositData);
+      alert('Ingreso registrado exitosamente');
+      // Refresh data
+      await Promise.all([refetchCards(), refetchAccounts()]);
+    } catch (error) {
+      console.error('Error registering deposit:', error);
+      alert('Error al registrar el ingreso');
+    }
   };
 
   return (
@@ -90,7 +111,11 @@ export default function AccountsScreen() {
               <Text style={styles.emptyText}>No tienes tarjetas asociadas</Text>
             ) : (
               cards.map(card => (
-                <View key={card.id} style={styles.listItem}>
+                <TouchableOpacity
+                  key={card.id}
+                  style={styles.listItem}
+                  onPress={() => handleCardPress(card)}
+                >
                   <View style={styles.listItemIcon}>
                     <Feather name="credit-card" size={24} color={appTheme.colors.accent} />
                   </View>
@@ -99,7 +124,7 @@ export default function AccountsScreen() {
                     <Text style={styles.listItemSubtitle}>{card.account.name}</Text>
                   </View>
                   <Feather name="chevron-right" size={20} color={appTheme.colors.textSecondary} />
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>
@@ -122,6 +147,14 @@ export default function AccountsScreen() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onSubmit={handleAddCard}
+      />
+
+      <DepositModal
+        visible={depositModalVisible}
+        onClose={() => setDepositModalVisible(false)}
+        onSubmit={handleDeposit}
+        cardId={selectedCard?.id || 0}
+        cardName={selectedCard ? `Tarjeta •••• ${selectedCard.number.slice(-4)}` : ''}
       />
     </SafeAreaView>
   );
