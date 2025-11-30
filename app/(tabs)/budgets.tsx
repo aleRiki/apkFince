@@ -1,5 +1,6 @@
 import CreateTransactionModal from '@/components/CreateTransactionModal';
 import EditBudgetModal from '@/components/EditBudgetModal';
+import GoalModal from '@/components/GoalModal';
 import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { api } from '@/services/api';
@@ -32,21 +33,6 @@ const INITIAL_BUDGETS = [
   { id: '11', category: 'other_expense', name: 'Otros', spent: 0, budget: 100, icon: 'more-horizontal' },
 ];
 
-// Direct mapping since we are now using the API category keys directly in our budgets
-const CATEGORY_MAPPING: Record<string, string> = {
-  'rent': 'rent',
-  'food_groceries': 'food_groceries',
-  'entertainment': 'entertainment',
-  'transportation': 'transportation',
-  'utilities_electricity': 'utilities_electricity',
-  'utilities_phone': 'utilities_phone',
-  'utilities_internet': 'utilities_internet',
-  'debt_payment': 'debt_payment',
-  'health_care': 'health_care',
-  'shopping': 'shopping',
-  'other_expense': 'other_expense',
-};
-
 interface Transaction {
   id: number;
   transactionType: string;
@@ -56,22 +42,41 @@ interface Transaction {
   date: string;
 }
 
+interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  savedAmount: number;
+  icon: string;
+}
+
 export default function BudgetsScreen() {
   const [activeTab, setActiveTab] = useState<'budgets' | 'goals'>('budgets');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modals state
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [goalModalVisible, setGoalModalVisible] = useState(false);
+
   const [selectedBudget, setSelectedBudget] = useState<{ name: string, budget: number, id: string } | null>(null);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
   const [globalBudget, setGlobalBudget] = useState<number | null>(null);
+
+  // Goals state
+  const [goals, setGoals] = useState<Goal[]>([
+    { id: '1', name: 'Fondo de Emergencia', targetAmount: 10000, savedAmount: 0, icon: 'umbrella' },
+    { id: '2', name: 'Vacaciones 2026', targetAmount: 5000, savedAmount: 0, icon: 'sun' },
+  ]);
+  const [totalIncome, setTotalIncome] = useState(0);
 
   const fetchTransactions = async () => {
     try {
       setLoading(true);
       const data = await api.get('/api/v1/transaction');
 
-      // Filter only expenses (withdraw)
+      // Filter expenses (withdraw)
       const expenses = data
         .filter((tx: any) => tx.transactionType === 'withdraw')
         .map((tx: any) => ({
@@ -83,8 +88,15 @@ export default function BudgetsScreen() {
           date: tx.date,
         }));
 
+      // Calculate total income (deposits)
+      const income = data
+        .filter((tx: any) => tx.transactionType === 'deposit')
+        .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+      setTotalIncome(income);
       setTransactions(expenses);
       calculateBudgets(expenses);
+      calculateGoalsProgress(income);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
@@ -113,15 +125,45 @@ export default function BudgetsScreen() {
     });
   };
 
+  const calculateGoalsProgress = (income: number) => {
+    setGoals(prevGoals => {
+      let remainingIncome = income;
+      return prevGoals.map(goal => {
+        const amountForThisGoal = Math.min(remainingIncome, goal.targetAmount);
+        remainingIncome = Math.max(0, remainingIncome - amountForThisGoal);
+        return { ...goal, savedAmount: amountForThisGoal };
+      });
+    });
+  };
+
   const handleCreateTransaction = async (transactionData: any) => {
     try {
       await api.post('/api/v1/transaction', transactionData);
-      // Refresh data
       fetchTransactions();
     } catch (error) {
       console.error('Error creating transaction:', error);
       alert('Error al crear la transacción');
     }
+  };
+
+  const handleCreateGoal = (goalData: { name: string; targetAmount: number; icon: string }) => {
+    const newGoal: Goal = {
+      id: Date.now().toString(),
+      ...goalData,
+      savedAmount: 0,
+    };
+
+    // Add new goal and recalculate progress immediately
+    setGoals(prev => {
+      const updatedGoals = [...prev, newGoal];
+      // Recalculate progress for all goals including the new one
+      let remainingIncome = totalIncome;
+      return updatedGoals.map(goal => {
+        const amountForThisGoal = Math.min(remainingIncome, goal.targetAmount);
+        remainingIncome = Math.max(0, remainingIncome - amountForThisGoal);
+        return { ...goal, savedAmount: amountForThisGoal };
+      });
+    });
   };
 
   const handleBudgetPress = (budget: any) => {
@@ -164,8 +206,6 @@ export default function BudgetsScreen() {
   const sumOfBudgets = budgets.reduce((sum, b) => sum + b.budget, 0);
   const totalBudget = globalBudget !== null ? globalBudget : sumOfBudgets;
   const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
-
-  // Calculate progress for the summary card
   const progressPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
   return (
@@ -177,7 +217,6 @@ export default function BudgetsScreen() {
         <LogoutButton />
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'budgets' && styles.activeTab]}
@@ -200,7 +239,6 @@ export default function BudgetsScreen() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {activeTab === 'budgets' && (
           <>
-            {/* Summary Card */}
             <TouchableOpacity
               style={styles.summaryCard}
               activeOpacity={0.8}
@@ -218,7 +256,6 @@ export default function BudgetsScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Presupuestos List */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tus Presupuestos</Text>
               <Text style={styles.sectionSubtitle}>Toca una tarjeta para editar el límite</Text>
@@ -268,7 +305,6 @@ export default function BudgetsScreen() {
               )}
             </View>
 
-            {/* Recent Expenses List */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Últimos Gastos</Text>
               {transactions.length === 0 ? (
@@ -294,39 +330,45 @@ export default function BudgetsScreen() {
         {activeTab === 'goals' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tus Metas de Ahorro</Text>
+            <Text style={styles.sectionSubtitle}>
+              Progreso basado en ingresos totales: {formatCurrency(totalIncome)}
+            </Text>
 
-            {/* Mock Goals */}
-            <View style={styles.goalCard}>
-              <View style={styles.goalHeader}>
-                <View style={styles.goalIconContainer}>
-                  <Feather name="umbrella" size={24} color={appTheme.colors.info} />
-                </View>
-                <View style={styles.goalHeaderContent}>
-                  <Text style={styles.goalName}>Fondo de Emergencia</Text>
-                  <Text style={styles.goalAmount}>€4,500 / €10,000</Text>
-                </View>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: '45%' }]} />
-              </View>
-              <Text style={styles.goalProgress}>45% completado</Text>
-            </View>
+            {goals.map(goal => {
+              const percent = Math.min((goal.savedAmount / goal.targetAmount) * 100, 100);
+              const isCompleted = percent >= 100;
+              const color = isCompleted ? appTheme.colors.success : appTheme.colors.info;
 
-            <View style={styles.goalCard}>
-              <View style={styles.goalHeader}>
-                <View style={styles.goalIconContainer}>
-                  <Feather name="sun" size={24} color={appTheme.colors.warning} />
+              return (
+                <View key={goal.id} style={styles.goalCard}>
+                  <View style={styles.goalHeader}>
+                    <View style={[styles.goalIconContainer, { backgroundColor: `${color}20` }]}>
+                      <Feather name={goal.icon as any} size={24} color={color} />
+                    </View>
+                    <View style={styles.goalHeaderContent}>
+                      <Text style={styles.goalName}>{goal.name}</Text>
+                      <Text style={styles.goalAmount}>
+                        {formatCurrency(goal.savedAmount)} / {formatCurrency(goal.targetAmount)}
+                      </Text>
+                    </View>
+                    {isCompleted && (
+                      <View style={styles.completedBadge}>
+                        <Feather name="check" size={16} color="#FFF" />
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.progressBar}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${percent}%`, backgroundColor: color }
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.goalProgress}>{percent.toFixed(0)}% completado</Text>
                 </View>
-                <View style={styles.goalHeaderContent}>
-                  <Text style={styles.goalName}>Vacaciones 2026</Text>
-                  <Text style={styles.goalAmount}>€2,100 / €5,000</Text>
-                </View>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: '42%' }]} />
-              </View>
-              <Text style={styles.goalProgress}>42% completado</Text>
-            </View>
+              );
+            })}
           </View>
         )}
 
@@ -337,7 +379,13 @@ export default function BudgetsScreen() {
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.8}
-        onPress={() => setModalVisible(true)}
+        onPress={() => {
+          if (activeTab === 'budgets') {
+            setModalVisible(true);
+          } else {
+            setGoalModalVisible(true);
+          }
+        }}
       >
         <View style={styles.fabContent}>
           <Feather name="plus" size={28} color="#FFF" />
@@ -355,6 +403,12 @@ export default function BudgetsScreen() {
         onClose={() => setEditModalVisible(false)}
         onSubmit={handleUpdateBudget}
         currentBudget={selectedBudget}
+      />
+
+      <GoalModal
+        visible={goalModalVisible}
+        onClose={() => setGoalModalVisible(false)}
+        onSubmit={handleCreateGoal}
       />
     </SafeAreaView>
   );
@@ -517,7 +571,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -539,6 +592,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: appTheme.colors.textSecondary,
     textAlign: 'center',
+    marginTop: 8,
+  },
+  completedBadge: {
+    backgroundColor: appTheme.colors.success,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',
