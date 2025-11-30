@@ -1,4 +1,6 @@
+import { AboutModal } from '@/components/AboutModal';
 import { EditProfileModal } from '@/components/EditProfileModal';
+import { HelpSupportModal } from '@/components/HelpSupportModal';
 import { appTheme } from '@/constants/appTheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUser } from '@/hooks/useUser';
@@ -23,6 +25,8 @@ export default function SettingsScreen() {
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
     const [biometricsEnabled, setBiometricsEnabled] = React.useState(false);
     const [editModalVisible, setEditModalVisible] = React.useState(false);
+    const [helpModalVisible, setHelpModalVisible] = React.useState(false);
+    const [aboutModalVisible, setAboutModalVisible] = React.useState(false);
 
     const handleLogout = () => {
         logout();
@@ -141,13 +145,13 @@ export default function SettingsScreen() {
                     <SettingItem
                         icon="help-circle"
                         title="Ayuda y Soporte"
-                        onPress={() => { }}
+                        onPress={() => setHelpModalVisible(true)}
                     />
                     <SettingItem
                         icon="info"
                         title="Acerca de"
                         subtitle="Versión 1.0.0"
-                        onPress={() => { }}
+                        onPress={() => setAboutModalVisible(true)}
                     />
                 </View>
 
@@ -172,6 +176,16 @@ export default function SettingsScreen() {
                     onSave={handleSaveProfile}
                 />
             )}
+
+            <HelpSupportModal
+                visible={helpModalVisible}
+                onClose={() => setHelpModalVisible(false)}
+            />
+
+            <AboutModal
+                visible={aboutModalVisible}
+                onClose={() => setAboutModalVisible(false)}
+            />
         </SafeAreaView>
     );
 }
