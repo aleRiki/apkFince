@@ -1,8 +1,10 @@
 import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
-import { mockCategoryExpenses, mockMonthlyData } from '@/constants/mockData';
-import React, { useState } from 'react';
+import { api } from '@/services/api';
+import { Feather } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   ScrollView,
   StatusBar,
@@ -14,17 +16,208 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
-const CHART_WIDTH = width - 40;
+
+// Shared configuration (should be in a config file in a real app)
+const INITIAL_BUDGETS = [
+  { id: '1', category: 'rent', name: 'Alquiler', spent: 0, budget: 800, icon: 'home', color: '#6366F1' },
+  { id: '2', category: 'food_groceries', name: 'Comida', spent: 0, budget: 400, icon: 'shopping-cart', color: '#EC4899' },
+  { id: '3', category: 'entertainment', name: 'Entretenimiento', spent: 0, budget: 150, icon: 'film', color: '#8B5CF6' },
+  { id: '4', category: 'transportation', name: 'Transporte', spent: 0, budget: 100, icon: 'truck', color: '#3B82F6' },
+  { id: '5', category: 'utilities_internet', name: 'Internet', spent: 0, budget: 50, icon: 'wifi', color: '#10B981' },
+  { id: '6', category: 'utilities_electricity', name: 'Electricidad', spent: 0, budget: 80, icon: 'zap', color: '#F59E0B' },
+  { id: '7', category: 'utilities_phone', name: 'Teléfono', spent: 0, budget: 40, icon: 'phone', color: '#EF4444' },
+  { id: '8', category: 'shopping', name: 'Compras', spent: 0, budget: 200, icon: 'shopping-bag', color: '#F97316' },
+  { id: '9', category: 'health_care', name: 'Salud', spent: 0, budget: 100, icon: 'heart', color: '#14B8A6' },
+  { id: '10', category: 'debt_payment', name: 'Deudas', spent: 0, budget: 300, icon: 'credit-card', color: '#64748B' },
+  { id: '11', category: 'other_expense', name: 'Otros', spent: 0, budget: 100, icon: 'more-horizontal', color: '#94A3B8' },
+];
+
+const INITIAL_GOALS = [
+  { id: '1', name: 'Fondo de Emergencia', targetAmount: 10000, savedAmount: 0, icon: 'umbrella' },
+  { id: '2', name: 'Vacaciones 2026', targetAmount: 5000, savedAmount: 0, icon: 'sun' },
+];
+
+interface Transaction {
+  id: number;
+  transactionType: string;
+  amount: number;
+  description: string;
+  category: string;
+  date: string;
+}
+
+interface CategoryExpense {
+  category: string;
+  amount: number;
+  percentage: number;
+  color: string;
+  name: string;
+}
+
+interface MonthlyData {
+  month: string;
+  income: number;
+  expense: number;
+}
 
 export default function AnalyticsScreen() {
   const [activeTab, setActiveTab] = useState<'month' | 'quarter' | 'year'>('month');
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const totalIncome = 2850;
-  const totalExpenses = 1975.50;
-  const balance = totalIncome - totalExpenses;
+  // Financial Summary
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [balance, setBalance] = useState(0);
 
-  // Simple donut chart calculation
-  const total = mockCategoryExpenses.reduce((sum, cat) => sum + cat.amount, 0);
+  // Charts Data
+  const [categoryExpenses, setCategoryExpenses] = useState<CategoryExpense[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+
+  // Goals & Budgets
+  const [goals, setGoals] = useState(INITIAL_GOALS);
+  const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
+
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const data = await api.get('/api/v1/transaction');
+
+      // Filter valid transactions and normalize data
+      const validTransactions = data
+        .filter((tx: any) => tx && tx.amount)
+        .map((tx: any) => ({
+          ...tx,
+          amount: parseFloat(tx.amount),
+          date: tx.date ? new Date(tx.date) : new Date(), // Fallback to now if date is missing
+          transactionType: (tx.transactionType || '').toLowerCase()
+        }));
+
+      // Process data based on active tab (filtering by date)
+      const now = new Date();
+      let startDate = new Date();
+
+      if (activeTab === 'month') {
+        startDate.setMonth(now.getMonth() - 1);
+      } else if (activeTab === 'quarter') {
+        startDate.setMonth(now.getMonth() - 3);
+      } else {
+        startDate.setFullYear(now.getFullYear() - 1);
+      }
+
+      const filteredTransactions = validTransactions.filter((tx: any) => {
+        return tx.date >= startDate && tx.date <= now;
+      });
+
+      setTransactions(filteredTransactions);
+      calculateFinancials(filteredTransactions);
+      calculateCategoryExpenses(filteredTransactions);
+      calculateMonthlyData(validTransactions); // Use all data for trend
+      calculateGoalsAndBudgets(validTransactions); // Use all data for total status
+
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateFinancials = (txs: any[]) => {
+    const income = txs
+      .filter((tx: any) => tx.transactionType === 'deposit')
+      .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+    const expenses = txs
+      .filter((tx: any) => tx.transactionType === 'withdraw')
+      .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+    setTotalIncome(income);
+    setTotalExpenses(expenses);
+    setBalance(income - expenses);
+  };
+
+  const calculateCategoryExpenses = (txs: any[]) => {
+    const expenses = txs.filter((tx: any) => tx.transactionType === 'withdraw');
+    const totalExp = expenses.reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+    if (totalExp === 0) {
+      setCategoryExpenses([]);
+      return;
+    }
+
+    const grouped = INITIAL_BUDGETS.map(budget => {
+      const amount = expenses
+        .filter((tx: any) => tx.category === budget.category)
+        .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+      return {
+        category: budget.category,
+        name: budget.name,
+        amount,
+        percentage: parseFloat(((amount / totalExp) * 100).toFixed(1)),
+        color: budget.color || '#94A3B8'
+      };
+    }).filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+
+    setCategoryExpenses(grouped);
+  };
+
+  const calculateMonthlyData = (txs: any[]) => {
+    const last6Months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      return d;
+    }).reverse();
+
+    const data = last6Months.map(date => {
+      const monthStr = date.toLocaleString('es-ES', { month: 'short' });
+      const monthTx = txs.filter((tx: any) => {
+        const txDate = new Date(tx.date);
+        return txDate.getMonth() === date.getMonth() && txDate.getFullYear() === date.getFullYear();
+      });
+
+      const income = monthTx
+        .filter((tx: any) => tx.transactionType === 'deposit')
+        .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+      const expense = monthTx
+        .filter((tx: any) => tx.transactionType === 'withdraw')
+        .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+      return { month: monthStr, income, expense };
+    });
+
+    setMonthlyData(data);
+  };
+
+  const calculateGoalsAndBudgets = (txs: any[]) => {
+    // Calculate Budgets
+    const expenses = txs.filter((tx: any) => tx.transactionType === 'withdraw');
+    const updatedBudgets = INITIAL_BUDGETS.map(b => {
+      const spent = expenses
+        .filter((tx: any) => tx.category === b.category)
+        .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+      return { ...b, spent };
+    });
+    setBudgets(updatedBudgets);
+
+    // Calculate Goals (Waterfall)
+    const income = txs
+      .filter((tx: any) => tx.transactionType === 'deposit')
+      .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+
+    let remainingIncome = income;
+    const updatedGoals = INITIAL_GOALS.map(goal => {
+      const amountForThisGoal = Math.min(remainingIncome, goal.targetAmount);
+      remainingIncome = Math.max(0, remainingIncome - amountForThisGoal);
+      return { ...goal, savedAmount: amountForThisGoal };
+    });
+    setGoals(updatedGoals);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -57,107 +250,167 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Period Summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.cardTitle}>Resumen del Período</Text>
-
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Ingresos Totales</Text>
-              <Text style={[styles.summaryValue, styles.incomeText]}>
-                {formatCurrency(totalIncome)}
-              </Text>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Gastos Totales</Text>
-              <Text style={[styles.summaryValue, styles.expenseText]}>
-                {formatCurrency(totalExpenses)}
-              </Text>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Balance</Text>
-              <Text style={[styles.summaryValue, balance >= 0 ? styles.incomeText : styles.expenseText]}>
-                {formatCurrency(balance)}
-              </Text>
-            </View>
-          </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={appTheme.colors.primary} />
         </View>
+      ) : (
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+          {/* Period Summary */}
+          <View style={styles.summaryCard}>
+            <Text style={styles.cardTitle}>Resumen del Período</Text>
 
-        {/* Donut Chart */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Gastos por Categoría</Text>
-
-          <View style={styles.donutContainer}>
-            <View style={styles.donutChart}>
-              {mockCategoryExpenses.map((cat, index) => {
-                const percentage = (cat.amount / total) * 100;
-                return (
-                  <View key={index} style={styles.donutSegment}>
-                    <View style={[styles.donutBar, { backgroundColor: cat.color, height: `${percentage}%` }]} />
-                  </View>
-                );
-              })}
-            </View>
-
-            <View style={styles.donutCenter}>
-              <Text style={styles.donutCenterLabel}>Total</Text>
-              <Text style={styles.donutCenterValue}>{formatCurrency(total)}</Text>
-            </View>
-          </View>
-
-          <View style={styles.legend}>
-            {mockCategoryExpenses.map((cat, index) => (
-              <View key={index} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
-                <Text style={styles.legendLabel}>{cat.category}</Text>
-                <Text style={styles.legendValue}>{cat.percentage}%</Text>
-                <Text style={styles.legendAmount}>{formatCurrency(cat.amount)}</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Ingresos Totales</Text>
+                <Text style={[styles.summaryValue, styles.incomeText]}>
+                  {formatCurrency(totalIncome)}
+                </Text>
               </View>
-            ))}
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Gastos Totales</Text>
+                <Text style={[styles.summaryValue, styles.expenseText]}>
+                  {formatCurrency(totalExpenses)}
+                </Text>
+              </View>
+
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Balance</Text>
+                <Text style={[styles.summaryValue, balance >= 0 ? styles.incomeText : styles.expenseText]}>
+                  {formatCurrency(balance)}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
 
-        {/* Bar Chart */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Evolución Mensual</Text>
+          {/* Donut Chart */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Gastos por Categoría</Text>
 
-          <View style={styles.barChart}>
-            <View style={styles.barChartBars}>
-              {mockMonthlyData.map((data, index) => {
-                const maxValue = Math.max(...mockMonthlyData.map(d => Math.max(d.income, d.expense)));
-                const incomeHeight = (data.income / maxValue) * 140;
-                const expenseHeight = (data.expense / maxValue) * 140;
-
-                return (
-                  <View key={index} style={styles.barGroup}>
-                    <View style={styles.barPair}>
-                      <View style={[styles.bar, styles.incomeBar, { height: incomeHeight }]} />
-                      <View style={[styles.bar, styles.expenseBar, { height: expenseHeight }]} />
-                    </View>
-                    <Text style={styles.barLabel}>{data.month}</Text>
+            {categoryExpenses.length > 0 ? (
+              <>
+                <View style={styles.donutContainer}>
+                  <View style={styles.donutChart}>
+                    {categoryExpenses.map((cat, index) => (
+                      <View key={index} style={styles.donutSegment}>
+                        <View style={[styles.donutBar, { backgroundColor: cat.color, height: `${cat.percentage}%` }]} />
+                      </View>
+                    ))}
                   </View>
-                );
-              })}
+
+                  <View style={styles.donutCenter}>
+                    <Text style={styles.donutCenterLabel}>Total</Text>
+                    <Text style={styles.donutCenterValue}>{formatCurrency(totalExpenses)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.legend}>
+                  {categoryExpenses.map((cat, index) => (
+                    <View key={index} style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
+                      <Text style={styles.legendLabel}>{cat.name}</Text>
+                      <Text style={styles.legendValue}>{cat.percentage}%</Text>
+                      <Text style={styles.legendAmount}>{formatCurrency(cat.amount)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <Text style={styles.emptyText}>No hay gastos en este período</Text>
+            )}
+          </View>
+
+          {/* Goals Compliance */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Cumplimiento de Metas</Text>
+            {goals.map(goal => {
+              const progress = Math.min((goal.savedAmount / goal.targetAmount) * 100, 100);
+              return (
+                <View key={goal.id} style={styles.goalItem}>
+                  <View style={styles.goalHeader}>
+                    <View style={styles.goalIcon}>
+                      <Feather name={goal.icon as any} size={16} color={appTheme.colors.primary} />
+                    </View>
+                    <Text style={styles.goalName}>{goal.name}</Text>
+                    <Text style={styles.goalAmount}>{formatCurrency(goal.savedAmount)} / {formatCurrency(goal.targetAmount)}</Text>
+                  </View>
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                  </View>
+                  <Text style={styles.goalPercent}>{progress.toFixed(1)}%</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Budget Analysis */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Análisis de Presupuesto</Text>
+            {budgets.filter(b => b.spent > 0).map(budget => {
+              const progress = Math.min((budget.spent / budget.budget) * 100, 100);
+              const remaining = Math.max(0, budget.budget - budget.spent);
+              const isOverBudget = budget.spent > budget.budget;
+
+              return (
+                <View key={budget.id} style={styles.budgetItem}>
+                  <View style={styles.budgetHeader}>
+                    <Text style={styles.budgetName}>{budget.name}</Text>
+                    <Text style={[styles.budgetRemaining, isOverBudget && styles.overBudget]}>
+                      {isOverBudget ? 'Excedido: ' : 'Disponible: '}
+                      {formatCurrency(Math.abs(remaining))}
+                    </Text>
+                  </View>
+                  <View style={styles.progressBar}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${progress}%`,
+                          backgroundColor: isOverBudget ? appTheme.colors.error : budget.color
+                        }
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.budgetFooter}>
+                    <Text style={styles.budgetSpent}>Gastado: {formatCurrency(budget.spent)}</Text>
+                    <Text style={styles.budgetLimit}>Límite: {formatCurrency(budget.budget)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+            {budgets.filter(b => b.spent > 0).length === 0 && (
+              <Text style={styles.emptyText}>No hay gastos registrados para analizar</Text>
+            )}
+          </View>
+
+          {/* Bar Chart (Monthly Evolution) */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Evolución Mensual</Text>
+
+            <View style={styles.barChart}>
+              <View style={styles.barChartBars}>
+                {monthlyData.map((data, index) => {
+                  const maxValue = Math.max(...monthlyData.map(d => Math.max(d.income, d.expense)), 100);
+                })}
+              </View>
+            </View>
+
+            <View style={styles.chartLegend}>
+              <View style={styles.chartLegendItem}>
+                <View style={[styles.chartLegendDot, { backgroundColor: appTheme.colors.success }]} />
+                <Text style={styles.chartLegendText}>Ingresos</Text>
+              </View>
+              <View style={styles.chartLegendItem}>
+                <View style={[styles.chartLegendDot, { backgroundColor: appTheme.colors.error }]} />
+                <Text style={styles.chartLegendText}>Gastos</Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.chartLegend}>
-            <View style={styles.chartLegendItem}>
-              <View style={[styles.chartLegendDot, { backgroundColor: appTheme.colors.success }]} />
-              <Text style={styles.chartLegendText}>Ingresos</Text>
-            </View>
-            <View style={styles.chartLegendItem}>
-              <View style={[styles.chartLegendDot, { backgroundColor: appTheme.colors.error }]} />
-              <Text style={styles.chartLegendText}>Gastos</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -166,6 +419,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: appTheme.colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -369,6 +627,90 @@ const styles = StyleSheet.create({
   },
   chartLegendText: {
     fontSize: 13,
+    color: appTheme.colors.textSecondary,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: appTheme.colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 10,
+  },
+  goalItem: {
+    marginBottom: 16,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  goalIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(14, 165, 164, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  goalName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: appTheme.colors.text,
+  },
+  goalAmount: {
+    fontSize: 14,
+    color: appTheme.colors.textSecondary,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: appTheme.colors.primary,
+    borderRadius: 4,
+  },
+  goalPercent: {
+    fontSize: 12,
+    color: appTheme.colors.textSecondary,
+    textAlign: 'right',
+  },
+  budgetItem: {
+    marginBottom: 20,
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  budgetName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: appTheme.colors.text,
+  },
+  budgetRemaining: {
+    fontSize: 14,
+    color: appTheme.colors.success,
+    fontWeight: '600',
+  },
+  overBudget: {
+    color: appTheme.colors.error,
+  },
+  budgetFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  budgetSpent: {
+    fontSize: 12,
+    color: appTheme.colors.textSecondary,
+  },
+  budgetLimit: {
+    fontSize: 12,
     color: appTheme.colors.textSecondary,
   },
 });
