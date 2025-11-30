@@ -1,27 +1,40 @@
+import { EditProfileModal } from '@/components/EditProfileModal';
 import { appTheme } from '@/constants/appTheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUser } from '@/hooks/useUser';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import {
+    ActivityIndicator,
     ScrollView,
     StatusBar,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
     const { user, logout } = useAuth();
+    const { userData, loading, updateUserData } = useUser();
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
     const [biometricsEnabled, setBiometricsEnabled] = React.useState(false);
+    const [editModalVisible, setEditModalVisible] = React.useState(false);
 
     const handleLogout = () => {
         logout();
         router.replace('/auth/login');
+    };
+
+    const handleEditProfile = () => {
+        setEditModalVisible(true);
+    };
+
+    const handleSaveProfile = async (data: { name: string; email: string; role: string }) => {
+        return await updateUserData(data);
     };
 
     const getInitials = (name: string) => {
@@ -61,18 +74,29 @@ export default function SettingsScreen() {
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 {/* Profile Section */}
                 <View style={styles.profileCard}>
-                    <View style={styles.avatarContainer}>
-                        <Text style={styles.avatarText}>
-                            {user?.name ? getInitials(user.name) : 'U'}
-                        </Text>
-                    </View>
-                    <View style={styles.profileInfo}>
-                        <Text style={styles.userName}>{user?.name || 'Usuario'}</Text>
-                        <Text style={styles.userEmail}>{user?.email || 'usuario@email.com'}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.editButton}>
-                        <Feather name="edit-2" size={18} color={appTheme.colors.primary} />
-                    </TouchableOpacity>
+                    {loading ? (
+                        <ActivityIndicator size="large" color={appTheme.colors.primary} />
+                    ) : (
+                        <>
+                            <View style={styles.avatarContainer}>
+                                <Text style={styles.avatarText}>
+                                    {userData?.name ? getInitials(userData.name) : 'U'}
+                                </Text>
+                            </View>
+                            <View style={styles.profileInfo}>
+                                <Text style={styles.userName}>{userData?.name || user?.name || 'Usuario'}</Text>
+                                <Text style={styles.userEmail}>{userData?.email || user?.email || 'usuario@email.com'}</Text>
+                                {userData?.role && (
+                                    <Text style={styles.userRole}>
+                                        {userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}
+                                    </Text>
+                                )}
+                            </View>
+                            <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+                                <Feather name="edit-2" size={18} color={appTheme.colors.primary} />
+                            </TouchableOpacity>
+                        </>
+                    )}
                 </View>
 
                 {/* General Settings */}
@@ -135,6 +159,19 @@ export default function SettingsScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {userData && (
+                <EditProfileModal
+                    visible={editModalVisible}
+                    onClose={() => setEditModalVisible(false)}
+                    userData={{
+                        name: userData.name,
+                        email: userData.email,
+                        role: userData.role,
+                    }}
+                    onSave={handleSaveProfile}
+                />
+            )}
         </SafeAreaView>
     );
 }
@@ -193,6 +230,12 @@ const styles = StyleSheet.create({
     userEmail: {
         fontSize: 14,
         color: appTheme.colors.textSecondary,
+    },
+    userRole: {
+        fontSize: 12,
+        color: appTheme.colors.primary,
+        marginTop: 4,
+        fontWeight: '600',
     },
     editButton: {
         padding: 8,

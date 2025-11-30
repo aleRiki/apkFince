@@ -5,6 +5,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -13,6 +14,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,18 +31,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const token = response.token;
       if (token) {
         api.setToken(token);
-      }
 
-      // Decode token to extract user name if not in response directly
-      const userName = response.name || response.user?.name || 'Usuario';
+        // Decode JWT token to extract user data
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split('')
+              .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+              .join('')
+          );
+          const payload = JSON.parse(jsonPayload);
 
-      if (token) {
-        setUser({
-          id: response.id || response.user?.id || '1',
-          name: userName,
-          email: response.email || email,
-        });
-        return true;
+          console.log('Decoded token payload:', payload);
+
+          setUser({
+            id: payload.id?.toString() || '1',
+            name: payload.name || response.name || 'Usuario',
+            email: payload.email || response.email || email,
+            role: payload.role,
+          });
+          return true;
+        } catch (decodeError) {
+          console.error('Error decoding token:', decodeError);
+          // Fallback to response data
+          setUser({
+            id: response.id?.toString() || '1',
+            name: response.name || 'Usuario',
+            email: response.email || email,
+          });
+          return true;
+        }
       }
       return false;
     } catch (error) {
@@ -83,6 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('User logged out successfully');
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -91,6 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         register,
         logout,
+        updateUser,
       }}
     >
       {children}
