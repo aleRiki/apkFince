@@ -55,7 +55,7 @@ export default function HomeScreen() {
       const accountsData = await api.get('/api/v1/accounts');
       const formattedAccounts = accountsData.map((acc: any) => {
         // Determine currency from type field or fallback to name
-        let currency = 'EUR';
+        let currency = 'USD';
         const type = (acc.type || '').toUpperCase();
         const accountInfo = `${acc.name} ${acc.address || ''}`.toUpperCase();
 
@@ -254,7 +254,7 @@ export default function HomeScreen() {
 
         {/* Resumen Semanal */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Resumen Semanal</Text>
+          <Text style={styles.sectionTitle}>Balance de Transaciones</Text>
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
@@ -311,29 +311,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Presupuestos */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Presupuestos</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/budgets')}>
-              <Text style={styles.seeAll}>Ver todo</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View>
-            {mockBudgets.slice(0, 3).map(budget => (
-              <BudgetProgress
-                key={budget.id}
-                category={budget.category}
-                name={budget.name}
-                spent={budget.spent}
-                budget={budget.budget}
-                icon={budget.icon}
-              />
-            ))}
-          </View>
-        </View>
-
+      
         {/* Bottom Spacing */}
         <View style={{ height: 100 }} />
       </ScrollView>
