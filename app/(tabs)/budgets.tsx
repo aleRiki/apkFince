@@ -477,7 +477,7 @@ export default function BudgetsScreen() {
       <AddTaskModal
         visible={taskModalVisible}
         onClose={() => setTaskModalVisible(false)}
-        onSubmit={(task) => createTask(task.title, task.category)}
+        onSubmit={(task) => createTask(task.title, task.category, task.userIds)}
       />
     </SafeAreaView>
   );

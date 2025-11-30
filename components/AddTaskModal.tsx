@@ -1,20 +1,29 @@
 import { appTheme } from '@/constants/appTheme';
+import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
+    FlatList,
     Modal,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
 
 interface AddTaskModalProps {
     visible: boolean;
     onClose: () => void;
-    onSubmit: (task: { title: string; category: string }) => void;
+    onSubmit: (task: { title: string; category: string; userIds: number[] }) => void;
 }
 
 const CATEGORIES = [
@@ -33,6 +42,55 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     const [title, setTitle] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('shopping');
 
+    // User search state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [users, setUsers] = useState<User[]>([]);
+    const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+    const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [showUserSearch, setShowUserSearch] = useState(false);
+
+    useEffect(() => {
+        if (visible && showUserSearch) {
+            fetchUsers();
+        }
+    }, [visible, showUserSearch]);
+
+    useEffect(() => {
+        if (searchQuery) {
+            const lower = searchQuery.toLowerCase();
+            setFilteredUsers(users.filter(u =>
+                u.name.toLowerCase().includes(lower) ||
+                u.email.toLowerCase().includes(lower)
+            ));
+        } else {
+            setFilteredUsers(users);
+        }
+    }, [searchQuery, users]);
+
+    const fetchUsers = async () => {
+        setLoadingUsers(true);
+        try {
+            const data = await api.get('/api/v1/users');
+            setUsers(data);
+            setFilteredUsers(data);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        } finally {
+            setLoadingUsers(false);
+        }
+    };
+
+    const toggleUserSelection = (userId: number) => {
+        setSelectedUserIds(prev => {
+            if (prev.includes(userId)) {
+                return prev.filter(id => id !== userId);
+            } else {
+                return [...prev, userId];
+            }
+        });
+    };
+
     const handleSubmit = () => {
         if (!title.trim()) {
             Alert.alert('Error', 'Por favor ingresa un título para la tarea');
@@ -42,17 +100,18 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         onSubmit({
             title: title.trim(),
             category: selectedCategory,
+            userIds: selectedUserIds
         });
 
-        // Reset form
-        setTitle('');
-        setSelectedCategory('shopping');
-        onClose();
+        handleClose();
     };
 
     const handleClose = () => {
         setTitle('');
         setSelectedCategory('shopping');
+        setSearchQuery('');
+        setSelectedUserIds([]);
+        setShowUserSearch(false);
         onClose();
     };
 
@@ -111,6 +170,57 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                                 ))}
                             </View>
                         </View>
+
+                        <View style={styles.inputGroup}>
+                            <TouchableOpacity
+                                style={styles.toggleSearchButton}
+                                onPress={() => setShowUserSearch(!showUserSearch)}
+                            >
+                                <Text style={styles.label}>Colaboradores ({selectedUserIds.length})</Text>
+                                <Feather name={showUserSearch ? "chevron-up" : "chevron-down"} size={20} color={appTheme.colors.text} />
+                            </TouchableOpacity>
+
+                            {showUserSearch && (
+                                <View style={styles.userSearchContainer}>
+                                    <TextInput
+                                        style={[styles.input, { marginBottom: 8 }]}
+                                        value={searchQuery}
+                                        onChangeText={setSearchQuery}
+                                        placeholder="Buscar usuarios..."
+                                        placeholderTextColor={appTheme.colors.textSecondary}
+                                    />
+
+                                    {loadingUsers ? (
+                                        <ActivityIndicator color={appTheme.colors.primary} />
+                                    ) : (
+                                        <FlatList
+                                            data={filteredUsers}
+                                            keyExtractor={item => item.id.toString()}
+                                            style={{ maxHeight: 150 }}
+                                            nestedScrollEnabled
+                                            renderItem={({ item }) => {
+                                                const isSelected = selectedUserIds.includes(item.id);
+                                                return (
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.userItem,
+                                                            isSelected && styles.userItemActive
+                                                        ]}
+                                                        onPress={() => toggleUserSelection(item.id)}
+                                                    >
+                                                        <View style={styles.userInfo}>
+                                                            <Text style={[styles.userName, isSelected && styles.userTextActive]}>{item.name}</Text>
+                                                            <Text style={[styles.userEmail, isSelected && styles.userTextActive]}>{item.email}</Text>
+                                                        </View>
+                                                        {isSelected && <Feather name="check" size={16} color="#FFF" />}
+                                                    </TouchableOpacity>
+                                                );
+                                            }}
+                                        />
+                                    )}
+                                </View>
+                            )}
+                        </View>
                     </View>
 
                     <View style={styles.buttonContainer}>
@@ -146,7 +256,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         paddingTop: 20,
         paddingBottom: 40,
-        maxHeight: '80%',
+        maxHeight: '90%',
     },
     header: {
         flexDirection: 'row',
@@ -238,4 +348,43 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#FFF',
     },
+    toggleSearchButton: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    userSearchContainer: {
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.1)',
+    },
+    userItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 4,
+    },
+    userItemActive: {
+        backgroundColor: appTheme.colors.primary,
+    },
+    userInfo: {
+        flex: 1,
+    },
+    userName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: appTheme.colors.text,
+    },
+    userEmail: {
+        fontSize: 12,
+        color: appTheme.colors.textSecondary,
+    },
+    userTextActive: {
+        color: '#FFF',
+    }
 });

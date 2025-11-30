@@ -31,14 +31,15 @@ export const useTasks = () => {
     }
   }, []);
 
-  const createTask = async (title: string, category: string) => {
+  const createTask = async (title: string, category: string, userIds: number[] = []) => {
     try {
       // Backend expects 'description' and 'isCompleted'
       // Mapping 'category' from UI to 'description' for backend
       const newTask = await api.post('/api/v1/taskt', {
         title,
         description: category, 
-        isCompleted: false
+        isCompleted: false,
+        userIds
       });
       setTasks(prev => [...prev, newTask]);
       return true;
