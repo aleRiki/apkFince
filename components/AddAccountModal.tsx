@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import BankListModal from './BankListModal';
 
 interface AddAccountModalProps {
     visible: boolean;
@@ -44,7 +45,8 @@ export default function AddAccountModal({
     const [balance, setBalance] = useState('');
     const [selectedCurrency, setSelectedCurrency] = useState('CUP');
     const [selectedAccountType, setSelectedAccountType] = useState('personal');
-    const [bankId, setBankId] = useState('1');
+    const [selectedBank, setSelectedBank] = useState<any>(null);
+    const [bankListVisible, setBankListVisible] = useState(false);
 
     useEffect(() => {
         if (visible) {
@@ -53,13 +55,12 @@ export default function AddAccountModal({
             setBalance('');
             setSelectedCurrency('CUP');
             setSelectedAccountType('personal');
-            setBankId('1');
+            setSelectedBank(null);
         }
     }, [visible]);
 
     const handleSubmit = () => {
         const numBalance = parseFloat(balance);
-        const numBankId = parseInt(bankId);
 
         if (!name.trim()) {
             alert('Por favor ingresa un nombre para la cuenta');
@@ -71,8 +72,8 @@ export default function AddAccountModal({
             return;
         }
 
-        if (!bankId || isNaN(numBankId) || numBankId <= 0) {
-            alert('Por favor ingresa un ID de banco válido');
+        if (!selectedBank) {
+            alert('Por favor selecciona un banco');
             return;
         }
 
@@ -81,7 +82,7 @@ export default function AddAccountModal({
             type: selectedCurrency,
             balance: numBalance,
             typeAccount: selectedAccountType,
-            bankId: numBankId,
+            bankId: selectedBank.id,
         });
 
         onClose();
@@ -212,17 +213,28 @@ export default function AddAccountModal({
                                 </View>
                             </View>
 
-                            {/* Bank ID Input */}
+                            {/* Bank Selection */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>ID del Banco</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="1"
-                                    placeholderTextColor={appTheme.colors.textSecondary}
-                                    keyboardType="numeric"
-                                    value={bankId}
-                                    onChangeText={setBankId}
-                                />
+                                <Text style={styles.label}>Banco</Text>
+                                <TouchableOpacity
+                                    style={styles.selectButton}
+                                    onPress={() => setBankListVisible(true)}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <View style={styles.bankIcon}>
+                                            <Feather name="briefcase" size={20} color={appTheme.colors.primary} />
+                                        </View>
+                                        <View>
+                                            <Text style={styles.selectButtonText}>
+                                                {selectedBank ? selectedBank.name : 'Seleccionar Banco'}
+                                            </Text>
+                                            {selectedBank && (
+                                                <Text style={styles.selectButtonSubtext}>{selectedBank.address}</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                    <Feather name="chevron-down" size={20} color={appTheme.colors.textSecondary} />
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </ScrollView>
@@ -232,6 +244,12 @@ export default function AddAccountModal({
                     </TouchableOpacity>
                 </View>
             </View>
+
+            <BankListModal
+                visible={bankListVisible}
+                onClose={() => setBankListVisible(false)}
+                onSelectBank={setSelectedBank}
+            />
         </Modal>
     );
 }
@@ -358,5 +376,32 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 16,
         fontWeight: '700',
+    },
+    selectButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+    },
+    selectButtonText: {
+        color: appTheme.colors.text,
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    selectButtonSubtext: {
+        color: appTheme.colors.textSecondary,
+        fontSize: 12,
+    },
+    bankIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(14, 165, 164, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
