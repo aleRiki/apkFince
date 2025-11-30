@@ -425,7 +425,7 @@ export default function BudgetsScreen() {
                 <TaskItem
                   key={task.id}
                   task={task}
-                  onToggleComplete={(id) => toggleTaskCompletion(id, task.completed)}
+                  onToggleComplete={(id) => toggleTaskCompletion(id, task.isCompleted)}
                   onShare={(t) => console.log('Sharing', t)}
                 />
               ))

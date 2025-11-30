@@ -13,9 +13,9 @@ import {
 export interface Task {
     id: string;
     title: string;
-    category: string;
-    completed: boolean;
-    createdAt: string;
+    description: string;
+    isCompleted: boolean;
+    createdAt?: string;
 }
 
 interface TaskItemProps {
@@ -37,12 +37,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     onToggleComplete,
     onShare,
 }) => {
-    const categoryConfig = CATEGORY_CONFIG[task.category] || CATEGORY_CONFIG.other;
+    // Backend returns 'description' which holds the category key
+    const categoryConfig = CATEGORY_CONFIG[task.description] || CATEGORY_CONFIG.other;
 
     const handleShare = async () => {
         try {
             const result = await Share.share({
-                message: `📋 Tarea: ${task.title}\n📁 Categoría: ${categoryConfig.label}\n${task.completed ? '✅ Completada' : '⏳ Pendiente'}`,
+                message: `📋 Tarea: ${task.title}\n📁 Categoría: ${categoryConfig.label}\n${task.isCompleted ? '✅ Completada' : '⏳ Pendiente'}`,
                 title: 'Compartir Tarea',
             });
 
@@ -55,7 +56,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     };
 
     return (
-        <View style={[styles.container, task.completed && styles.containerCompleted]}>
+        <View style={[styles.container, task.isCompleted && styles.containerCompleted]}>
             <TouchableOpacity
                 style={styles.checkbox}
                 onPress={() => onToggleComplete(task.id)}
@@ -63,9 +64,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             >
                 <View style={[
                     styles.checkboxInner,
-                    task.completed && styles.checkboxChecked
+                    task.isCompleted && styles.checkboxChecked
                 ]}>
-                    {task.completed && (
+                    {task.isCompleted && (
                         <Feather name="check" size={16} color="#FFF" />
                     )}
                 </View>
@@ -75,7 +76,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 <View style={styles.header}>
                     <Text style={[
                         styles.title,
-                        task.completed && styles.titleCompleted
+                        task.isCompleted && styles.titleCompleted
                     ]}>
                         {task.title}
                     </Text>
