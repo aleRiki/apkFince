@@ -1,3 +1,4 @@
+import AddAccountModal from '@/components/AddAccountModal';
 import AddCardModal from '@/components/AddCardModal';
 import DepositModal from '@/components/DepositModal';
 import LogoutButton from '@/components/LogoutButton';
@@ -19,7 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AccountsScreen() {
   const [activeTab, setActiveTab] = useState<'accounts' | 'cards'>('accounts');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [cardModalVisible, setCardModalVisible] = useState(false);
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [depositModalVisible, setDepositModalVisible] = useState(false);
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const { accounts, loading, refetch: refetchAccounts } = useAccounts();
@@ -29,6 +31,17 @@ export default function AccountsScreen() {
 
   const handleAddCard = async (cardNumber: string, accountId: number) => {
     await addCard({ number: cardNumber, account: accountId });
+  };
+
+  const handleAddAccount = async (accountData: any) => {
+    try {
+      await api.post('/api/v1/accounts', accountData);
+      alert('Cuenta creada exitosamente');
+      await refetchAccounts();
+    } catch (error) {
+      console.error('Error creating account:', error);
+      alert('Error al crear la cuenta');
+    }
   };
 
   const handleCardPress = (card: any) => {
@@ -136,16 +149,28 @@ export default function AccountsScreen() {
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.8}
-        onPress={() => setModalVisible(true)}
+        onPress={() => {
+          if (activeTab === 'accounts') {
+            setAccountModalVisible(true);
+          } else {
+            setCardModalVisible(true);
+          }
+        }}
       >
         <View style={styles.fabContent}>
           <Feather name="plus" size={28} color="#FFF" />
         </View>
       </TouchableOpacity>
 
+      <AddAccountModal
+        visible={accountModalVisible}
+        onClose={() => setAccountModalVisible(false)}
+        onSubmit={handleAddAccount}
+      />
+
       <AddCardModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        visible={cardModalVisible}
+        onClose={() => setCardModalVisible(false)}
         onSubmit={handleAddCard}
       />
 
