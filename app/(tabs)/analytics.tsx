@@ -62,6 +62,7 @@ interface MonthlyData {
 
 export default function AnalyticsScreen() {
   const [activeTab, setActiveTab] = useState<'month' | 'quarter' | 'year'>('month');
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -80,7 +81,70 @@ export default function AnalyticsScreen() {
 
   useEffect(() => {
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, selectedDate]);
+
+  const getDateRange = () => {
+    const start = new Date(selectedDate);
+    const end = new Date(selectedDate);
+
+    if (activeTab === 'month') {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      end.setMonth(end.getMonth() + 1);
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+    } else if (activeTab === 'quarter') {
+      const quarter = Math.floor(selectedDate.getMonth() / 3);
+      start.setMonth(quarter * 3);
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      end.setMonth(start.getMonth() + 3);
+      end.setDate(0);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start.setMonth(0, 1);
+      start.setHours(0, 0, 0, 0);
+      end.setMonth(11, 31);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    return { start, end };
+  };
+
+  const getPeriodLabel = () => {
+    if (activeTab === 'month') {
+      return selectedDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+    } else if (activeTab === 'quarter') {
+      const quarter = Math.floor(selectedDate.getMonth() / 3) + 1;
+      return `T${quarter} ${selectedDate.getFullYear()}`;
+    } else {
+      return selectedDate.getFullYear().toString();
+    }
+  };
+
+  const handlePreviousPeriod = () => {
+    const newDate = new Date(selectedDate);
+    if (activeTab === 'month') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else if (activeTab === 'quarter') {
+      newDate.setMonth(newDate.getMonth() - 3);
+    } else {
+      newDate.setFullYear(newDate.getFullYear() - 1);
+    }
+    setSelectedDate(newDate);
+  };
+
+  const handleNextPeriod = () => {
+    const newDate = new Date(selectedDate);
+    if (activeTab === 'month') {
+      newDate.setMonth(newDate.getMonth() + 1);
+    } else if (activeTab === 'quarter') {
+      newDate.setMonth(newDate.getMonth() + 3);
+    } else {
+      newDate.setFullYear(newDate.getFullYear() + 1);
+    }
+    setSelectedDate(newDate);
+  };
 
   const fetchData = async () => {
     try {
@@ -97,20 +161,10 @@ export default function AnalyticsScreen() {
           transactionType: (tx.transactionType || '').toLowerCase()
         }));
 
-      // Process data based on active tab (filtering by date)
-      const now = new Date();
-      let startDate = new Date();
-
-      if (activeTab === 'month') {
-        startDate.setMonth(now.getMonth() - 1);
-      } else if (activeTab === 'quarter') {
-        startDate.setMonth(now.getMonth() - 3);
-      } else {
-        startDate.setFullYear(now.getFullYear() - 1);
-      }
+      const { start, end } = getDateRange();
 
       const filteredTransactions = validTransactions.filter((tx: any) => {
-        return tx.date >= startDate && tx.date <= now;
+        return tx.date >= start && tx.date <= end;
       });
 
       setTransactions(filteredTransactions);
@@ -247,6 +301,17 @@ export default function AnalyticsScreen() {
           onPress={() => setActiveTab('year')}
         >
           <Text style={[styles.tabText, activeTab === 'year' && styles.activeTabText]}>Año</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Date Navigation */}
+      <View style={styles.dateNav}>
+        <TouchableOpacity onPress={handlePreviousPeriod} style={styles.navButton}>
+          <Feather name="chevron-left" size={24} color={appTheme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.dateLabel}>{getPeriodLabel()}</Text>
+        <TouchableOpacity onPress={handleNextPeriod} style={styles.navButton}>
+          <Feather name="chevron-right" size={24} color={appTheme.colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -392,6 +457,18 @@ export default function AnalyticsScreen() {
               <View style={styles.barChartBars}>
                 {monthlyData.map((data, index) => {
                   const maxValue = Math.max(...monthlyData.map(d => Math.max(d.income, d.expense)), 100);
+                  const incomeHeight = (data.income / maxValue) * 140;
+                  const expenseHeight = (data.expense / maxValue) * 140;
+
+                  return (
+                    <View key={index} style={styles.barGroup}>
+                      <View style={styles.barPair}>
+                        <View style={[styles.bar, styles.incomeBar, { height: Math.max(incomeHeight, 4) }]} />
+                        <View style={[styles.bar, styles.expenseBar, { height: Math.max(expenseHeight, 4) }]} />
+                      </View>
+                      <Text style={styles.barLabel}>{data.month}</Text>
+                    </View>
+                  );
                 })}
               </View>
             </View>
@@ -462,6 +539,26 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#FFF',
+  },
+  dateNav: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 16,
+  },
+  navButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: appTheme.colors.backgroundCard,
+  },
+  dateLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: appTheme.colors.text,
+    minWidth: 150,
+    textAlign: 'center',
+    textTransform: 'capitalize',
   },
   container: {
     flex: 1,
