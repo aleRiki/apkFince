@@ -27,6 +27,7 @@ interface Account {
   lastDigits: string;
   balance: number;
   colors: string[];
+  currency?: string;
 }
 
 interface Transaction {
@@ -52,15 +53,26 @@ export default function HomeScreen() {
 
       // Fetch accounts
       const accountsData = await api.get('/api/v1/accounts');
-      const formattedAccounts = accountsData.map((acc: any, index: number) => {
-        // Generate color based on index
-        const colors = [
-          ['#10B981', '#059669'], // Green
-          ['#F59E0B', '#D97706'], // Orange
-          ['#3B82F6', '#2563EB'], // Blue
-          ['#8B5CF6', '#7C3AED'], // Purple
-          ['#EC4899', '#DB2777'], // Pink
-        ];
+      const formattedAccounts = accountsData.map((acc: any) => {
+        // Determine currency from account name or address
+        const accountInfo = `${acc.name} ${acc.address}`.toUpperCase();
+        let currency = 'EUR'; // Default
+
+        if (accountInfo.includes('USD') || accountInfo.includes('DOLLAR')) {
+          currency = 'USD';
+        } else if (accountInfo.includes('CUP') || accountInfo.includes('PESO')) {
+          currency = 'CUP';
+        } else if (accountInfo.includes('CRYPTO') || accountInfo.includes('BTC') || accountInfo.includes('ETH')) {
+          currency = 'CRYPTO';
+        }
+
+        // Color mapping based on currency
+        const currencyColors: Record<string, [string, string]> = {
+          'USD': ['#10B981', '#059669'],      // Green
+          'EUR': ['#94A3B8', '#64748B'],      // Silver/Gray
+          'CUP': ['#F97316', '#EA580C'],      // Copper/Orange
+          'CRYPTO': ['#F59E0B', '#D97706'],   // Gold
+        };
 
         return {
           id: acc.id,
@@ -68,7 +80,8 @@ export default function HomeScreen() {
           bank: acc.address || 'Banco',
           lastDigits: String(acc.id).padStart(4, '0').slice(-4),
           balance: parseFloat(acc.balance) || 0,
-          colors: colors[index % colors.length],
+          colors: currencyColors[currency] || currencyColors['EUR'],
+          currency,
         };
       });
       setAccounts(formattedAccounts);
