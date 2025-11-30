@@ -10,6 +10,7 @@ interface AccountCardProps {
     lastDigits: string;
     balance: number;
     colors: string[];
+    currency?: string;
     onPress?: () => void;
 }
 
@@ -19,6 +20,7 @@ export default function AccountCard({
     lastDigits,
     balance,
     colors,
+    currency = 'EUR',
     onPress,
 }: AccountCardProps) {
     return (
@@ -41,7 +43,7 @@ export default function AccountCard({
 
                 <View style={styles.footer}>
                     <Text style={styles.balanceLabel}>Saldo</Text>
-                    <Text style={styles.balance}>{formatCurrency(balance)}</Text>
+                    <Text style={styles.balance}>{formatCurrency(balance, currency)}</Text>
                 </View>
             </LinearGradient>
         </TouchableOpacity>

@@ -107,7 +107,7 @@ export default function AccountsScreen() {
                   <Text style={styles.listItemTitle}>{account.name}</Text>
                   <Text style={styles.listItemSubtitle}>{account.bank} •••• {account.lastDigits}</Text>
                 </View>
-                <Text style={styles.listItemAmount}>{formatCurrency(account.balance)}</Text>
+                <Text style={styles.listItemAmount}>{formatCurrency(account.balance, account.currency)}</Text>
               </View>
             ))}
 

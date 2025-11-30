@@ -49,10 +49,10 @@ export const appTheme = {
   }
 };
 
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number, currency: string = 'EUR'): string => {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
-    currency: 'EUR',
+    currency: currency,
     minimumFractionDigits: 2,
   }).format(amount);
 };

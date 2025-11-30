@@ -16,7 +16,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -27,7 +27,7 @@ interface Account {
   lastDigits: string;
   balance: number;
   colors: string[];
-  currency?: string;
+  currency: string;
 }
 
 interface Transaction {
@@ -54,16 +54,22 @@ export default function HomeScreen() {
       // Fetch accounts
       const accountsData = await api.get('/api/v1/accounts');
       const formattedAccounts = accountsData.map((acc: any) => {
-        // Determine currency from account name or address
-        const accountInfo = `${acc.name} ${acc.address}`.toUpperCase();
-        let currency = 'EUR'; // Default
+        // Determine currency from type field or fallback to name
+        let currency = 'EUR';
+        const type = (acc.type || '').toUpperCase();
+        const accountInfo = `${acc.name} ${acc.address || ''}`.toUpperCase();
 
-        if (accountInfo.includes('USD') || accountInfo.includes('DOLLAR')) {
-          currency = 'USD';
-        } else if (accountInfo.includes('CUP') || accountInfo.includes('PESO')) {
-          currency = 'CUP';
-        } else if (accountInfo.includes('CRYPTO') || accountInfo.includes('BTC') || accountInfo.includes('ETH')) {
-          currency = 'CRYPTO';
+        if (['USD', 'EUR', 'CUP', 'CRYPTO', 'USDT', 'BTC', 'ETH'].includes(type)) {
+          currency = type;
+        } else {
+          // Fallback to name detection if type is not a currency (e.g. 'AHORROS')
+          if (accountInfo.includes('USD') || accountInfo.includes('DOLLAR')) {
+            currency = 'USD';
+          } else if (accountInfo.includes('CUP') || accountInfo.includes('PESO')) {
+            currency = 'CUP';
+          } else if (accountInfo.includes('CRYPTO') || accountInfo.includes('BTC') || accountInfo.includes('ETH')) {
+            currency = 'CRYPTO';
+          }
         }
 
         // Color mapping based on currency
@@ -72,6 +78,7 @@ export default function HomeScreen() {
           'EUR': ['#94A3B8', '#64748B'],      // Silver/Gray
           'CUP': ['#F97316', '#EA580C'],      // Copper/Orange
           'CRYPTO': ['#F59E0B', '#D97706'],   // Gold
+          'DEFAULT': ['#94A3B8', '#64748B'],  // Default Silver
         };
 
         return {
@@ -80,7 +87,7 @@ export default function HomeScreen() {
           bank: acc.address || 'Banco',
           lastDigits: String(acc.id).padStart(4, '0').slice(-4),
           balance: parseFloat(acc.balance) || 0,
-          colors: currencyColors[currency] || currencyColors['EUR'],
+          colors: currencyColors[currency] || currencyColors['DEFAULT'],
           currency,
         };
       });
@@ -234,6 +241,7 @@ export default function HomeScreen() {
                   lastDigits={account.lastDigits}
                   balance={account.balance}
                   colors={account.colors}
+                  currency={account.currency}
                 />
               ))}
             </ScrollView>
