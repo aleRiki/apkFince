@@ -9,15 +9,14 @@ import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -44,28 +43,12 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [weeklyChange, setWeeklyChange] = useState(0);
-
-  useEffect(() => {
-    // Initial fetch
-    fetchData();
-
-    // Set up interval to fetch data every 30 seconds for real-time updates
-    const intervalId = setInterval(() => {
-      fetchData();
-    }, 30000); // 30 seconds
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
-  }, []);
 
   const fetchData = async () => {
     try {
-      // Only show loading on initial fetch
-      if (accounts.length === 0) {
-        setLoading(true);
-      }
+      setLoading(true);
 
       // Fetch accounts
       const accountsData = await api.get('/api/v1/accounts');
@@ -129,6 +112,10 @@ export default function HomeScreen() {
     }
   };
 
+  const handleRefresh = async () => {
+    await fetchData();
+  };
+
   // Calculate total balance from real accounts
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
@@ -155,17 +142,6 @@ export default function HomeScreen() {
 
   const weeklyProgress = weeklyIncome > 0 ? (weeklyExpenses / weeklyIncome) * 100 : 0;
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={appTheme.colors.primary} />
-          <Text style={styles.loadingText}>Cargando datos...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
@@ -183,6 +159,17 @@ export default function HomeScreen() {
             </View>
           </View>
           <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={handleRefresh}
+              style={styles.iconButton}
+              disabled={loading}
+            >
+              <Feather
+                name="refresh-cw"
+                size={22}
+                color={loading ? appTheme.colors.textSecondary : appTheme.colors.primary}
+              />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
               <Feather name="bell" size={22} color={appTheme.colors.text} />
             </TouchableOpacity>
@@ -355,16 +342,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: appTheme.colors.textSecondary,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -396,58 +373,52 @@ const styles = StyleSheet.create({
     color: appTheme.colors.text,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: appTheme.colors.textSecondary,
-    marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: appTheme.colors.backgroundCard,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 8,
   },
   balanceCard: {
     marginHorizontal: 20,
-    marginTop: 16,
     borderRadius: 20,
     padding: 24,
-    ...appTheme.shadows.md,
+    marginBottom: 24,
   },
   balanceLabel: {
-    color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: 8,
   },
   balanceAmount: {
-    color: '#FFF',
     fontSize: 36,
     fontWeight: '900',
+    color: '#FFF',
     marginBottom: 12,
   },
   balanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    gap: 6,
+    alignSelf: 'flex-start',
   },
   balanceBadgeText: {
-    color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
+    color: '#FFF',
+    marginLeft: 4,
   },
   section: {
-    marginTop: 24,
     paddingHorizontal: 20,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -456,7 +427,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: appTheme.colors.text,
   },
@@ -488,13 +459,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: appTheme.colors.textSecondary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   summaryAmount: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
   },
   expenseAmount: {
     color: appTheme.colors.error,
@@ -503,18 +474,17 @@ const styles = StyleSheet.create({
     color: appTheme.colors.success,
   },
   progressContainer: {
-    marginTop: 4,
+    gap: 8,
   },
   progressBar: {
     height: 8,
     backgroundColor: 'rgba(148, 163, 184, 0.2)',
     borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: appTheme.colors.success,
+    backgroundColor: appTheme.colors.primary,
     borderRadius: 4,
   },
   progressText: {

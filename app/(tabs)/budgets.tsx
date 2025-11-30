@@ -5,8 +5,7 @@ import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -197,11 +196,13 @@ export default function BudgetsScreen() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchTransactions();
-    }, [])
-  );
+  const handleRefresh = async () => {
+    await fetchTransactions();
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   const sumOfBudgets = budgets.reduce((sum, b) => sum + b.budget, 0);
   const totalBudget = globalBudget !== null ? globalBudget : sumOfBudgets;
@@ -214,7 +215,20 @@ export default function BudgetsScreen() {
 
       <View style={styles.header}>
         <Text style={styles.title}>Presupuestos</Text>
-        <LogoutButton />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={styles.refreshButton}
+            disabled={loading}
+          >
+            <Feather
+              name="refresh-cw"
+              size={22}
+              color={loading ? appTheme.colors.textSecondary : appTheme.colors.primary}
+            />
+          </TouchableOpacity>
+          <LogoutButton />
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -426,6 +440,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  refreshButton: {
+    padding: 8,
   },
   title: {
     fontSize: 28,
