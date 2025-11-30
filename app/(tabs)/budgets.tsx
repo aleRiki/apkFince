@@ -1,8 +1,11 @@
+import { AddTaskModal } from '@/components/AddTaskModal';
 import CreateTransactionModal from '@/components/CreateTransactionModal';
 import EditBudgetModal from '@/components/EditBudgetModal';
 import GoalModal from '@/components/GoalModal';
 import LogoutButton from '@/components/LogoutButton';
+import { TaskItem } from '@/components/TaskItem';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
+import { useTasks } from '@/hooks/useTasks';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
@@ -50,7 +53,7 @@ interface Goal {
 }
 
 export default function BudgetsScreen() {
-  const [activeTab, setActiveTab] = useState<'budgets' | 'goals'>('budgets');
+  const [activeTab, setActiveTab] = useState<'budgets' | 'goals' | 'tasks'>('budgets');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,6 +61,7 @@ export default function BudgetsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [goalModalVisible, setGoalModalVisible] = useState(false);
+  const [taskModalVisible, setTaskModalVisible] = useState(false);
 
   const [selectedBudget, setSelectedBudget] = useState<{ name: string, budget: number, id: string } | null>(null);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
@@ -69,6 +73,9 @@ export default function BudgetsScreen() {
     { id: '2', name: 'Vacaciones 2026', targetAmount: 5000, savedAmount: 0, icon: 'sun' },
   ]);
   const [totalIncome, setTotalIncome] = useState(0);
+
+  // Tasks hook
+  const { tasks, loading: tasksLoading, createTask, toggleTaskCompletion } = useTasks();
 
   const fetchTransactions = async () => {
     try {
@@ -248,6 +255,14 @@ export default function BudgetsScreen() {
             Metas
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'tasks' && styles.activeTab]}
+          onPress={() => setActiveTab('tasks')}
+        >
+          <Text style={[styles.tabText, activeTab === 'tasks' && styles.activeTabText]}>
+            Tareas
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -386,6 +401,38 @@ export default function BudgetsScreen() {
           </View>
         )}
 
+        {activeTab === 'tasks' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tus Tareas</Text>
+            <Text style={styles.sectionSubtitle}>
+              Gestiona tus pendientes financieros y del hogar
+            </Text>
+
+            {tasksLoading ? (
+              <ActivityIndicator color={appTheme.colors.primary} />
+            ) : tasks.length === 0 ? (
+              <View style={{ alignItems: 'center', padding: 20 }}>
+                <Feather name="check-circle" size={48} color={appTheme.colors.textSecondary} />
+                <Text style={[styles.emptyText, { marginTop: 16 }]}>
+                  No tienes tareas pendientes
+                </Text>
+                <Text style={styles.hintText}>
+                  Toca el botón + para agregar una nueva tarea
+                </Text>
+              </View>
+            ) : (
+              tasks.map(task => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggleComplete={(id) => toggleTaskCompletion(id, task.completed)}
+                  onShare={(t) => console.log('Sharing', t)}
+                />
+              ))
+            )}
+          </View>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -396,8 +443,10 @@ export default function BudgetsScreen() {
         onPress={() => {
           if (activeTab === 'budgets') {
             setModalVisible(true);
-          } else {
+          } else if (activeTab === 'goals') {
             setGoalModalVisible(true);
+          } else {
+            setTaskModalVisible(true);
           }
         }}
       >
@@ -423,6 +472,12 @@ export default function BudgetsScreen() {
         visible={goalModalVisible}
         onClose={() => setGoalModalVisible(false)}
         onSubmit={handleCreateGoal}
+      />
+
+      <AddTaskModal
+        visible={taskModalVisible}
+        onClose={() => setTaskModalVisible(false)}
+        onSubmit={(task) => createTask(task.title, task.category)}
       />
     </SafeAreaView>
   );
@@ -615,6 +670,7 @@ const styles = StyleSheet.create({
     color: appTheme.colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
+    fontStyle: 'italic',
   },
   completedBadge: {
     backgroundColor: appTheme.colors.success,
