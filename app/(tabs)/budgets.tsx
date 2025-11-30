@@ -3,6 +3,7 @@ import CreateTransactionModal from '@/components/CreateTransactionModal';
 import EditBudgetModal from '@/components/EditBudgetModal';
 import GoalModal from '@/components/GoalModal';
 import LogoutButton from '@/components/LogoutButton';
+import { TaskDetailModal } from '@/components/TaskDetailModal';
 import { TaskItem } from '@/components/TaskItem';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { useTasks } from '@/hooks/useTasks';
@@ -62,6 +63,8 @@ export default function BudgetsScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
+  const [taskDetailModalVisible, setTaskDetailModalVisible] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const [selectedBudget, setSelectedBudget] = useState<{ name: string, budget: number, id: string } | null>(null);
   const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
@@ -427,6 +430,10 @@ export default function BudgetsScreen() {
                   task={task}
                   onToggleComplete={(id) => toggleTaskCompletion(id, task.isCompleted)}
                   onShare={(t) => console.log('Sharing', t)}
+                  onPress={(id) => {
+                    setSelectedTaskId(id);
+                    setTaskDetailModalVisible(true);
+                  }}
                 />
               ))
             )}
@@ -478,6 +485,15 @@ export default function BudgetsScreen() {
         visible={taskModalVisible}
         onClose={() => setTaskModalVisible(false)}
         onSubmit={(task) => createTask(task.title, task.category, task.userIds)}
+      />
+
+      <TaskDetailModal
+        visible={taskDetailModalVisible}
+        taskId={selectedTaskId}
+        onClose={() => {
+          setTaskDetailModalVisible(false);
+          setSelectedTaskId(null);
+        }}
       />
     </SafeAreaView>
   );

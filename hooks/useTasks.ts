@@ -9,6 +9,7 @@ export interface Task {
   isCompleted: boolean; // Changed from completed to match backend DTO
   createdAt?: string;
   userId?: string;
+  collaboratorCount?: number; // Number of collaborators (from users array length)
 }
 
 export const useTasks = () => {

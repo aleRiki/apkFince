@@ -16,12 +16,14 @@ export interface Task {
     description: string;
     isCompleted: boolean;
     createdAt?: string;
+    collaboratorCount?: number; // Count from list view
 }
 
 interface TaskItemProps {
     task: Task;
     onToggleComplete: (id: string) => void;
     onShare: (task: Task) => void;
+    onPress?: (id: string) => void; // New: callback to open detail
 }
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
@@ -36,6 +38,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     task,
     onToggleComplete,
     onShare,
+    onPress,
 }) => {
     // Backend returns 'description' which holds the category key
     const categoryConfig = CATEGORY_CONFIG[task.description] || CATEGORY_CONFIG.other;
@@ -56,10 +59,17 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     };
 
     return (
-        <View style={[styles.container, task.isCompleted && styles.containerCompleted]}>
+        <TouchableOpacity
+            style={[styles.container, task.isCompleted && styles.containerCompleted]}
+            onPress={() => onPress?.(task.id)}
+            activeOpacity={0.7}
+        >
             <TouchableOpacity
                 style={styles.checkbox}
-                onPress={() => onToggleComplete(task.id)}
+                onPress={(e) => {
+                    e.stopPropagation();
+                    onToggleComplete(task.id);
+                }}
                 activeOpacity={0.7}
             >
                 <View style={[
@@ -89,17 +99,27 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                             {categoryConfig.label}
                         </Text>
                     </View>
+
+                    {task.collaboratorCount !== undefined && task.collaboratorCount > 0 && (
+                        <View style={styles.collaboratorBadge}>
+                            <Feather name="users" size={12} color={appTheme.colors.primary} />
+                            <Text style={styles.collaboratorCount}>{task.collaboratorCount}</Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
             <TouchableOpacity
                 style={styles.shareButton}
-                onPress={handleShare}
+                onPress={(e) => {
+                    e.stopPropagation();
+                    handleShare();
+                }}
                 activeOpacity={0.7}
             >
                 <Feather name="share-2" size={18} color={appTheme.colors.primary} />
             </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
     );
 };
 
@@ -172,5 +192,19 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 8,
         backgroundColor: 'rgba(14, 165, 164, 0.1)',
+    },
+    collaboratorBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: 'rgba(14, 165, 164, 0.1)',
+    },
+    collaboratorCount: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: appTheme.colors.primary,
     },
 });
