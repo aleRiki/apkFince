@@ -58,6 +58,13 @@ export default function TabLayout() {
           href: null, // Hide from tabs
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Configuración',
+          tabBarIcon: ({ color }) => <Feather name="settings" size={24} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
