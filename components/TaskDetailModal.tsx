@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -32,6 +33,7 @@ interface TaskDetailModalProps {
     visible: boolean;
     taskId: string | null;
     onClose: () => void;
+    onDelete?: () => void;
 }
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
@@ -46,9 +48,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     visible,
     taskId,
     onClose,
+    onDelete,
 }) => {
     const [task, setTask] = useState<TaskDetail | null>(null);
     const [loading, setLoading] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         if (visible && taskId) {
@@ -68,6 +72,38 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleDelete = () => {
+        if (!task || !taskId) return;
+
+        Alert.alert(
+            'Eliminar Tarea',
+            '¿Estás seguro de que deseas eliminar esta tarea completada?',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setDeleting(true);
+                        try {
+                            await api.delete(`/api/v1/taskt/${taskId}`);
+                            onDelete?.();
+                            handleClose();
+                        } catch (error) {
+                            console.error('Error deleting task:', error);
+                            Alert.alert('Error', 'No se pudo eliminar la tarea');
+                        } finally {
+                            setDeleting(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleClose = () => {
@@ -158,8 +194,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     ) : null}
 
                     <View style={styles.buttonContainer}>
+                        {task?.isCompleted && (
+                            <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={handleDelete}
+                                disabled={deleting}
+                            >
+                                {deleting ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                ) : (
+                                    <>
+                                        <Feather name="trash-2" size={16} color="#FFF" />
+                                        <Text style={styles.deleteButtonText}>Eliminar</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        )}
                         <TouchableOpacity
-                            style={styles.closeButton}
+                            style={[styles.closeButton, task?.isCompleted && { flex: 1 }]}
                             onPress={handleClose}
                         >
                             <Text style={styles.closeButtonText}>Cerrar</Text>
@@ -305,10 +357,28 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     buttonContainer: {
+        flexDirection: 'row',
+        gap: 12,
         paddingHorizontal: 20,
         marginTop: 20,
     },
+    deleteButton: {
+        flex: 1,
+        flexDirection: 'row',
+        gap: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: appTheme.colors.error,
+        padding: 16,
+        borderRadius: 12,
+    },
+    deleteButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFF',
+    },
     closeButton: {
+        flex: 1,
         backgroundColor: appTheme.colors.primary,
         padding: 16,
         borderRadius: 12,

@@ -78,7 +78,7 @@ export default function BudgetsScreen() {
   const [totalIncome, setTotalIncome] = useState(0);
 
   // Tasks hook
-  const { tasks, loading: tasksLoading, createTask, toggleTaskCompletion } = useTasks();
+  const { tasks, loading: tasksLoading, createTask, toggleTaskCompletion, deleteTask, fetchTasks } = useTasks();
 
   const fetchTransactions = async () => {
     try {
@@ -493,6 +493,9 @@ export default function BudgetsScreen() {
         onClose={() => {
           setTaskDetailModalVisible(false);
           setSelectedTaskId(null);
+        }}
+        onDelete={() => {
+          fetchTasks(); // Refresh task list after deletion
         }}
       />
     </SafeAreaView>

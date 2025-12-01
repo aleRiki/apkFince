@@ -71,6 +71,18 @@ export const useTasks = () => {
     }
   };
 
+  const deleteTask = async (taskId: string) => {
+    try {
+      await api.delete(`/api/v1/taskt/${taskId}`);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      return true;
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      Alert.alert('Error', 'No se pudo eliminar la tarea');
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
@@ -81,6 +93,7 @@ export const useTasks = () => {
     error,
     fetchTasks,
     createTask,
-    toggleTaskCompletion
+    toggleTaskCompletion,
+    deleteTask
   };
 };

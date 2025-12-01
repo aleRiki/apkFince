@@ -77,5 +77,27 @@ export const api = {
       console.error('API Request Error:', error);
       throw error;
     }
+  },
+  delete: async (endpoint: string) => {
+    try {
+      const headers: HeadersInit = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      // DELETE might return empty response
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
+    } catch (error) {
+      console.error('API Request Error:', error);
+      throw error;
+    }
   }
 };
