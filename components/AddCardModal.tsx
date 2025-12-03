@@ -101,24 +101,39 @@ export default function AddCardModal({ visible, onClose, onSubmit }: AddCardModa
 
                             {showAccountPicker && (
                                 <View style={styles.accountList}>
-                                    {accounts.map(account => (
-                                        <TouchableOpacity
-                                            key={account.id}
-                                            style={styles.accountItem}
-                                            onPress={() => {
-                                                setSelectedAccountId(Number(account.id));
-                                                setShowAccountPicker(false);
-                                            }}
-                                        >
-                                            <View>
-                                                <Text style={styles.accountName}>{account.name}</Text>
-                                                <Text style={styles.accountBank}>{account.bank}</Text>
+                                    <ScrollView
+                                        style={styles.accountScrollView}
+                                        nestedScrollEnabled={true}
+                                        showsVerticalScrollIndicator={true}
+                                    >
+                                        {accounts.length > 0 ? (
+                                            accounts.map(account => (
+                                                <TouchableOpacity
+                                                    key={account.id}
+                                                    style={styles.accountItem}
+                                                    onPress={() => {
+                                                        setSelectedAccountId(Number(account.id));
+                                                        setShowAccountPicker(false);
+                                                    }}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={styles.accountInfo}>
+                                                        <Text style={styles.accountName}>{account.name}</Text>
+                                                        <Text style={styles.accountBank}>{account.bank}</Text>
+                                                    </View>
+                                                    {selectedAccountId === Number(account.id) && (
+                                                        <Feather name="check" size={20} color={appTheme.colors.primary} />
+                                                    )}
+                                                </TouchableOpacity>
+                                            ))
+                                        ) : (
+                                            <View style={styles.emptyAccounts}>
+                                                <Feather name="inbox" size={32} color={appTheme.colors.textSecondary} />
+                                                <Text style={styles.emptyAccountsText}>No hay cuentas disponibles</Text>
+                                                <Text style={styles.emptyAccountsSubtext}>Crea una cuenta primero</Text>
                                             </View>
-                                            {selectedAccountId === Number(account.id) && (
-                                                <Feather name="check" size={20} color={appTheme.colors.primary} />
-                                            )}
-                                        </TouchableOpacity>
-                                    ))}
+                                        )}
+                                    </ScrollView>
                                 </View>
                             )}
                         </View>
@@ -224,6 +239,15 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(148, 163, 184, 0.2)',
         maxHeight: 200,
+        zIndex: 1000,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    accountScrollView: {
+        maxHeight: 200,
     },
     accountItem: {
         padding: 16,
@@ -232,6 +256,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+    },
+    accountInfo: {
+        flex: 1,
     },
     accountName: {
         fontSize: 16,
@@ -242,6 +269,22 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: appTheme.colors.textSecondary,
         marginTop: 2,
+    },
+    emptyAccounts: {
+        padding: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyAccountsText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: appTheme.colors.textSecondary,
+        marginTop: 12,
+    },
+    emptyAccountsSubtext: {
+        fontSize: 12,
+        color: appTheme.colors.textSecondary,
+        marginTop: 4,
     },
     footer: {
         flexDirection: 'row',
