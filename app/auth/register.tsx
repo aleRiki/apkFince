@@ -44,13 +44,13 @@ export default function RegisterScreen() {
         setLoading(true);
         setError('');
 
-        const success = await register(name, email, password);
+        const result = await register(name, email, password);
         setLoading(false);
 
-        if (success) {
+        if (result.success) {
             router.push('/(tabs)');
         } else {
-            setError('Error al crear la cuenta');
+            setError(result.error || 'Error al crear la cuenta');
         }
     };
 

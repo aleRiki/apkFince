@@ -1,4 +1,4 @@
-import { api } from '@/services/api';
+import { api, ApiError } from '@/services/api';
 import React, { createContext, ReactNode, useContext, useState } from 'react';
 
 interface User {
@@ -11,8 +11,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const response = await api.post('/api/v1/auth/login', { email, password });
       console.log('Login response:', JSON.stringify(response, null, 2));
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: payload.email || response.email || email,
             role: payload.role,
           });
-          return true;
+          return { success: true };
         } catch (decodeError) {
           console.error('Error decoding token:', decodeError);
           // Fallback to response data
@@ -61,17 +61,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             name: response.name || 'Usuario',
             email: response.email || email,
           });
-          return true;
+          return { success: true };
         }
       }
-      return false;
-    } catch (error) {
+      return { success: false, error: 'No se recibió token del servidor' };
+    } catch (error: any) {
       console.error('Login failed:', error);
-      return false;
+
+      // Handle ApiError with specific messages
+      if (error instanceof ApiError) {
+        switch (error.type) {
+          case 'NETWORK':
+            return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
+          case 'TIMEOUT':
+            return { success: false, error: 'La conexión tardó demasiado. Intenta de nuevo.' };
+          case 'SERVER':
+            return { success: false, error: 'Error del servidor. Intenta más tarde.' };
+          case 'CLIENT':
+            if (error.statusCode === 401) {
+              return { success: false, error: 'Credenciales inválidas' };
+            }
+            return { success: false, error: 'Error en la solicitud' };
+          default:
+            return { success: false, error: error.message };
+        }
+      }
+
+      return { success: false, error: 'Error desconocido. Intenta de nuevo.' };
     }
   };
 
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+  const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const response = await api.post('/api/v1/auth/register', { name, email, password });
       console.log('Register response:', JSON.stringify(response, null, 2));
@@ -89,12 +109,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: userData.name || name,
           email: userData.email || email,
         });
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch (error) {
+      return { success: false, error: 'No se recibió información del usuario' };
+    } catch (error: any) {
       console.error('Registration failed:', error);
-      return false;
+
+      // Handle ApiError with specific messages
+      if (error instanceof ApiError) {
+        switch (error.type) {
+          case 'NETWORK':
+            return { success: false, error: 'Error de conexión. Verifica tu conexión a internet.' };
+          case 'TIMEOUT':
+            return { success: false, error: 'La conexión tardó demasiado. Intenta de nuevo.' };
+          case 'SERVER':
+            return { success: false, error: 'Error del servidor. Intenta más tarde.' };
+          case 'CLIENT':
+            if (error.statusCode === 400) {
+              return { success: false, error: 'Email ya registrado o datos inválidos' };
+            }
+            return { success: false, error: 'Error en la solicitud' };
+          default:
+            return { success: false, error: error.message };
+        }
+      }
+
+      return { success: false, error: 'Error desconocido. Intenta de nuevo.' };
     }
   };
 

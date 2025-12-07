@@ -32,13 +32,13 @@ export default function LoginScreen() {
         setLoading(true);
         setError('');
 
-        const success = await login(email, password);
+        const result = await login(email, password);
         setLoading(false);
 
-        if (success) {
+        if (result.success) {
             router.push('/(tabs)');
         } else {
-            setError('Credenciales inválidas');
+            setError(result.error || 'Error al iniciar sesión');
         }
     };
 
