@@ -41,9 +41,34 @@ export const api = {
       });
       
       if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+            const errorBody = await response.text();
+            console.log('API Error Response Body:', errorBody);
+            
+            // Try to parse JSON to get a cleaner message if possible
+            try {
+                const errorJson = JSON.parse(errorBody);
+                if (errorJson.message) {
+                    errorMessage = typeof errorJson.message === 'string' 
+                        ? errorJson.message 
+                        : JSON.stringify(errorJson.message);
+                } else {
+                    errorMessage = JSON.stringify(errorJson);
+                }
+            } catch (jsonError) {
+                // If not JSON, use the raw text if available
+                 if (errorBody && errorBody.trim().length > 0) {
+                    errorMessage = errorBody;
+                 }
+            }
+        } catch (readError) {
+            console.warn('Could not read error response body:', readError);
+        }
+
         const errorType = response.status >= 500 ? 'SERVER' : 'CLIENT';
         throw new ApiError(
-          `HTTP error! status: ${response.status}`,
+          errorMessage,
           errorType,
           response.status
         );

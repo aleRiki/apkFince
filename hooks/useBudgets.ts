@@ -13,6 +13,7 @@ export const useBudgets = () => {
     setError(null);
     try {
       const data = await api.get('/api/v1/presupuesto');
+      console.log('Fetched budgets structure:', JSON.stringify(data?.[0], null, 2));
       setBudgets(data);
     } catch (err) {
       console.error('Error fetching budgets:', err);

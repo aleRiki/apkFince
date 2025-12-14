@@ -10,6 +10,7 @@ import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useGoals } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
+import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -85,11 +86,60 @@ export default function BudgetsScreen() {
     }
   };
 
+  const getTransactionCategory = (budgetName: string): string => {
+    const lowerName = budgetName.toLowerCase();
+    if (lowerName.includes('alquiler') || lowerName.includes('renta')) return 'rent';
+    if (lowerName.includes('comida') || lowerName.includes('supermercado') || lowerName.includes('food')) return 'food_groceries';
+    if (lowerName.includes('entretenimiento') || lowerName.includes('cine')) return 'entertainment';
+    if (lowerName.includes('transporte') || lowerName.includes('gasolina') || lowerName.includes('uber')) return 'transportation';
+    if (lowerName.includes('luz') || lowerName.includes('electricidad')) return 'utilities_electricity';
+    if (lowerName.includes('telefono') || lowerName.includes('celular')) return 'utilities_phone';
+    if (lowerName.includes('internet') || lowerName.includes('wifi')) return 'utilities_internet';
+    if (lowerName.includes('deuda') || lowerName.includes('prestamo')) return 'debt_payment';
+    if (lowerName.includes('salud') || lowerName.includes('farmacia') || lowerName.includes('medico')) return 'health_care';
+    if (lowerName.includes('compras') || lowerName.includes('shopping') || lowerName.includes('ropa')) return 'shopping';
+    return 'other_expense';
+  };
+
   const handleUpdateBudgetProgress = async (budgetId: number, data: any) => {
+    // Find current budget state before update
+    const currentBudget = budgets.find(b => b.id === budgetId);
+    console.log('Current budget found:', JSON.stringify(currentBudget, null, 2));
+
+    // Optimistic calculation for transaction
+    if (currentBudget && data.porcentajeCumplido !== undefined) {
+      const previousPercent = currentBudget.porcentajeCumplido || 0;
+      const newPercent = data.porcentajeCumplido;
+
+      if (newPercent > previousPercent) {
+        const deltaPercent = newPercent - previousPercent;
+        const deltaAmount = (deltaPercent / 100) * currentBudget.presupuesto;
+
+        if (deltaAmount > 0) {
+          try {
+            const transactionCategory = getTransactionCategory(currentBudget.name);
+            const transactionData = {
+              transactionType: 'withdraw',
+              category: transactionCategory,
+              amount: deltaAmount,
+              description: `Gasto automático: ${currentBudget.name}`,
+              cardId: currentBudget.card?.id || currentBudget.cardId
+            };
+
+            console.log('Creating automatic transaction:', JSON.stringify(transactionData));
+            await api.post('/api/v1/transaction', transactionData);
+          } catch (error) {
+            console.error('Error creating automatic transaction:', error);
+            // Don't block the UI update if transaction fails
+          }
+        }
+      }
+    }
+
     const success = await updateBudget(budgetId, data);
     if (success) {
       setEditProgressModalVisible(false);
-      alert('Progreso actualizado exitosamente');
+      alert('Progreso actualizado y gasto registrado');
     }
   };
 
@@ -235,19 +285,27 @@ export default function BudgetsScreen() {
                   if (progress >= 75) progressColor = appTheme.colors.success;
                   else if (progress >= 50) progressColor = appTheme.colors.warning;
 
+                  const isCompleted = progress >= 100;
+
                   return (
                     <TouchableOpacity
                       key={budget.id}
-                      style={styles.budgetCard}
+                      style={[
+                        styles.budgetCard,
+                        isCompleted && { opacity: 0.8, backgroundColor: 'rgba(30,30,40,0.8)', borderColor: appTheme.colors.success, borderWidth: 1 }
+                      ]}
                       activeOpacity={0.7}
                       onPress={() => handleBudgetPress(budget)}
                     >
                       <View style={styles.budgetHeader}>
                         <View style={styles.budgetIconContainer}>
-                          <Feather name={icon as any} size={24} color={progressColor} />
+                          <Feather name={isCompleted ? "check-circle" : icon as any} size={24} color={progressColor} />
                         </View>
                         <View style={styles.budgetInfo}>
-                          <Text style={styles.budgetName}>{budget.name}</Text>
+                          <Text style={[
+                            styles.budgetName,
+                            isCompleted && { textDecorationLine: 'line-through', color: appTheme.colors.textSecondary }
+                          ]}>{budget.name}</Text>
                           <Text style={styles.budgetDescription}>{budget.description}</Text>
                           <Text style={styles.budgetAmount}>
                             <Text style={{ color: progressColor }}>
