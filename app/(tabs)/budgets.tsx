@@ -1,15 +1,17 @@
+import AddBudgetModal from '@/components/AddBudgetModal';
 import { AddTaskModal } from '@/components/AddTaskModal';
-import CreateTransactionModal from '@/components/CreateTransactionModal';
-import EditBudgetModal from '@/components/EditBudgetModal';
+import EditBudgetProgressModal from '@/components/EditBudgetProgressModal';
+import EditGoalProgressModal from '@/components/EditGoalProgressModal';
 import GoalModal from '@/components/GoalModal';
 import LogoutButton from '@/components/LogoutButton';
 import { TaskDetailModal } from '@/components/TaskDetailModal';
 import { TaskItem } from '@/components/TaskItem';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
+import { useBudgets } from '@/hooks/useBudgets';
+import { useGoals } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
-import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -17,207 +19,101 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Initial budgets configuration matching user requirements
-const INITIAL_BUDGETS = [
-  { id: '1', category: 'rent', name: 'Alquiler', spent: 0, budget: 800, icon: 'home' },
-  { id: '2', category: 'food_groceries', name: 'Comida', spent: 0, budget: 400, icon: 'shopping-cart' },
-  { id: '3', category: 'entertainment', name: 'Entretenimiento', spent: 0, budget: 150, icon: 'film' },
-  { id: '4', category: 'transportation', name: 'Transporte', spent: 0, budget: 100, icon: 'truck' },
-  { id: '5', category: 'utilities_internet', name: 'Internet', spent: 0, budget: 50, icon: 'wifi' },
-  { id: '6', category: 'utilities_electricity', name: 'Electricidad', spent: 0, budget: 80, icon: 'zap' },
-  { id: '7', category: 'utilities_phone', name: 'Teléfono', spent: 0, budget: 40, icon: 'phone' },
-  { id: '8', category: 'shopping', name: 'Compras', spent: 0, budget: 200, icon: 'shopping-bag' },
-  { id: '9', category: 'health_care', name: 'Salud', spent: 0, budget: 100, icon: 'heart' },
-  { id: '10', category: 'debt_payment', name: 'Deudas', spent: 0, budget: 300, icon: 'credit-card' },
-  { id: '11', category: 'other_expense', name: 'Otros', spent: 0, budget: 100, icon: 'more-horizontal' },
-];
-
-interface Transaction {
-  id: number;
-  transactionType: string;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-}
-
-interface Goal {
-  id: string;
-  name: string;
-  targetAmount: number;
-  savedAmount: number;
-  icon: string;
-}
+// Icon mapping for budgets
+const getBudgetIcon = (name: string): string => {
+  const iconMap: { [key: string]: string } = {
+    'alquiler': 'home',
+    'comida': 'shopping-cart',
+    'entretenimiento': 'film',
+    'transporte': 'truck',
+    'internet': 'wifi',
+    'electricidad': 'zap',
+    'teléfono': 'phone',
+    'compras': 'shopping-bag',
+    'salud': 'heart',
+    'deudas': 'credit-card',
+  };
+  const lowerName = name.toLowerCase();
+  for (const [key, icon] of Object.entries(iconMap)) {
+    if (lowerName.includes(key)) return icon;
+  }
+  return 'dollar-sign'; // default icon
+};
 
 export default function BudgetsScreen() {
   const [activeTab, setActiveTab] = useState<'budgets' | 'goals' | 'tasks'>('budgets');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modals state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [taskModalVisible, setTaskModalVisible] = useState(false);
   const [taskDetailModalVisible, setTaskDetailModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  const [selectedBudget, setSelectedBudget] = useState<{ name: string, budget: number, id: string } | null>(null);
-  const [budgets, setBudgets] = useState(INITIAL_BUDGETS);
-  const [globalBudget, setGlobalBudget] = useState<number | null>(null);
+  // Selected budget for editing progress
+  const [selectedBudget, setSelectedBudget] = useState<any | null>(null);
+  const [editProgressModalVisible, setEditProgressModalVisible] = useState(false);
 
-  // Goals state
-  const [goals, setGoals] = useState<Goal[]>([
-    { id: '1', name: 'Fondo de Emergencia', targetAmount: 10000, savedAmount: 0, icon: 'umbrella' },
-    { id: '2', name: 'Vacaciones 2026', targetAmount: 5000, savedAmount: 0, icon: 'sun' },
-  ]);
-  const [totalIncome, setTotalIncome] = useState(0);
+  // Edit Goal State
+  const [selectedGoal, setSelectedGoal] = useState<any | null>(null); // Assuming 'any' for now, replace with 'Goal' type
+  const [editGoalModalVisible, setEditGoalModalVisible] = useState(false);
+
+  // Use custom hooks for data management
+  const { budgets, loading: budgetsLoading, createBudget, updateBudget, fetchBudgets } = useBudgets();
+  const { goals, loading: goalsLoading, createGoal, fetchGoals, updateGoal } = useGoals();
 
   // Tasks hook
   const { tasks, loading: tasksLoading, createTask, toggleTaskCompletion, deleteTask, fetchTasks } = useTasks();
 
-  const fetchTransactions = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get('/api/v1/transaction');
-
-      // Filter expenses (withdraw)
-      const expenses = data
-        .filter((tx: any) => tx.transactionType === 'withdraw')
-        .map((tx: any) => ({
-          id: tx.id,
-          transactionType: tx.transactionType,
-          amount: parseFloat(tx.amount),
-          description: tx.description || tx.notes || 'Gasto',
-          category: tx.category,
-          date: tx.date,
-        }));
-
-      // Calculate total income (deposits)
-      const income = data
-        .filter((tx: any) => tx.transactionType === 'deposit')
-        .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
-
-      setTotalIncome(income);
-      setTransactions(expenses);
-      calculateBudgets(expenses);
-      calculateGoalsProgress(income);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-    } finally {
-      setLoading(false);
+  const handleCreateBudget = async (budgetData: any) => {
+    const success = await createBudget(budgetData);
+    if (success) {
+      setBudgetModalVisible(false);
+      alert('Presupuesto creado exitosamente');
     }
   };
 
-  const calculateBudgets = (expenses: Transaction[]) => {
-    setBudgets(prevBudgets => {
-      const newBudgets = prevBudgets.map(b => ({ ...b, spent: 0 }));
-
-      expenses.forEach(tx => {
-        const budgetIndex = newBudgets.findIndex(b => b.category === tx.category);
-
-        if (budgetIndex !== -1) {
-          newBudgets[budgetIndex].spent += tx.amount;
-        } else {
-          const otherIndex = newBudgets.findIndex(b => b.category === 'other_expense');
-          if (otherIndex !== -1) {
-            newBudgets[otherIndex].spent += tx.amount;
-          }
-        }
-      });
-
-      return newBudgets;
-    });
-  };
-
-  const calculateGoalsProgress = (income: number) => {
-    setGoals(prevGoals => {
-      let remainingIncome = income;
-      return prevGoals.map(goal => {
-        const amountForThisGoal = Math.min(remainingIncome, goal.targetAmount);
-        remainingIncome = Math.max(0, remainingIncome - amountForThisGoal);
-        return { ...goal, savedAmount: amountForThisGoal };
-      });
-    });
-  };
-
-  const handleCreateTransaction = async (transactionData: any) => {
-    try {
-      await api.post('/api/v1/transaction', transactionData);
-      fetchTransactions();
-    } catch (error) {
-      console.error('Error creating transaction:', error);
-      alert('Error al crear la transacción');
+  const handleCreateGoal = async (goalData: any) => {
+    const success = await createGoal(goalData);
+    if (success) {
+      setGoalModalVisible(false);
+      alert('Meta creada exitosamente');
     }
   };
 
-  const handleCreateGoal = (goalData: { name: string; targetAmount: number; icon: string }) => {
-    const newGoal: Goal = {
-      id: Date.now().toString(),
-      ...goalData,
-      savedAmount: 0,
-    };
-
-    // Add new goal and recalculate progress immediately
-    setGoals(prev => {
-      const updatedGoals = [...prev, newGoal];
-      // Recalculate progress for all goals including the new one
-      let remainingIncome = totalIncome;
-      return updatedGoals.map(goal => {
-        const amountForThisGoal = Math.min(remainingIncome, goal.targetAmount);
-        remainingIncome = Math.max(0, remainingIncome - amountForThisGoal);
-        return { ...goal, savedAmount: amountForThisGoal };
-      });
-    });
+  const handleUpdateBudgetProgress = async (budgetId: number, data: any) => {
+    const success = await updateBudget(budgetId, data);
+    if (success) {
+      setEditProgressModalVisible(false);
+      alert('Progreso actualizado exitosamente');
+    }
   };
 
   const handleBudgetPress = (budget: any) => {
-    setSelectedBudget({
-      id: budget.id,
-      name: budget.name,
-      budget: budget.budget
-    });
-    setEditModalVisible(true);
+    setSelectedBudget(budget);
+    setEditProgressModalVisible(true);
   };
 
-  const handleGlobalBudgetPress = () => {
-    const currentTotal = budgets.reduce((sum, b) => sum + b.budget, 0);
-    setSelectedBudget({
-      id: 'global',
-      name: 'Presupuesto Total Mensual',
-      budget: globalBudget !== null ? globalBudget : currentTotal
-    });
-    setEditModalVisible(true);
-  };
-
-  const handleUpdateBudget = (newLimit: number) => {
-    if (selectedBudget) {
-      if (selectedBudget.id === 'global') {
-        setGlobalBudget(newLimit);
-      } else {
-        setBudgets(prev => prev.map(b =>
-          b.id === selectedBudget.id ? { ...b, budget: newLimit } : b
-        ));
-      }
+  const handleUpdateGoal = async (goalId: number, data: any) => {
+    const success = await updateGoal(goalId, data);
+    if (success) {
+      setEditGoalModalVisible(false);
+      fetchGoals();
     }
   };
 
-  const handleRefresh = async () => {
-    await fetchTransactions();
+  const openEditGoal = (goal: any) => {
+    setSelectedGoal(goal);
+    setEditGoalModalVisible(true);
   };
 
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
-
-  const sumOfBudgets = budgets.reduce((sum, b) => sum + b.budget, 0);
-  const totalBudget = globalBudget !== null ? globalBudget : sumOfBudgets;
-  const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
-  const progressPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+  const handleRefresh = async () => {
+    await Promise.all([fetchBudgets(), fetchGoals(), fetchTasks()]);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -229,12 +125,12 @@ export default function BudgetsScreen() {
           <TouchableOpacity
             onPress={handleRefresh}
             style={styles.refreshButton}
-            disabled={loading}
+            disabled={budgetsLoading || goalsLoading || tasksLoading}
           >
             <Feather
               name="refresh-cw"
               size={22}
-              color={loading ? appTheme.colors.textSecondary : appTheme.colors.primary}
+              color={(budgetsLoading || goalsLoading || tasksLoading) ? appTheme.colors.textSecondary : appTheme.colors.primary}
             />
           </TouchableOpacity>
           <LogoutButton />
@@ -271,34 +167,74 @@ export default function BudgetsScreen() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {activeTab === 'budgets' && (
           <>
-            <TouchableOpacity
-              style={styles.summaryCard}
-              activeOpacity={0.8}
-              onPress={handleGlobalBudgetPress}
-            >
-              <Text style={styles.summaryLabel}>Total Gastado Por Mes</Text>
-              <Text style={styles.summaryAmount}>
-                {formatCurrency(totalSpent)} / {formatCurrency(totalBudget)}
-              </Text>
-              <Text style={styles.summarySubtext}>
-                {progressPercentage.toFixed(0)}% del presupuesto para este mes
-              </Text>
-              {globalBudget === null && (
-                <Text style={styles.hintText}>(Toca para definir presupuesto global)</Text>
-              )}
-            </TouchableOpacity>
+            {/* Summary Card */}
+            {budgets.length > 0 && (() => {
+              // Calculate totals
+              const totalPresupuesto = budgets.reduce((sum, b) => sum + b.presupuesto, 0);
+              const totalGastado = budgets.reduce((sum, b) => {
+                const spending = (b.presupuesto * (b.porcentajeCumplido || 0)) / 100;
+                return sum + spending;
+              }, 0);
+
+              const totalProgressPercent = totalPresupuesto > 0
+                ? Math.round((totalGastado / totalPresupuesto) * 100)
+                : 0;
+
+              // Determine color based on total progress
+              let progressColor = appTheme.colors.info;
+              if (totalProgressPercent >= 75) progressColor = appTheme.colors.success;
+              else if (totalProgressPercent >= 50) progressColor = appTheme.colors.warning;
+
+              return (
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryLabel}>Total Presupuesto Asignado</Text>
+                  <Text style={styles.summaryAmount}>
+                    <Text style={{ color: progressColor }}>
+                      {formatCurrency(totalGastado)}
+                    </Text>
+                    <Text style={{ color: appTheme.colors.textSecondary }}> / </Text>
+                    {formatCurrency(totalPresupuesto)}
+                  </Text>
+                  <Text style={styles.summarySubtext}>
+                    {budgets.length} presupuesto{budgets.length !== 1 ? 's' : ''} activo{budgets.length !== 1 ? 's' : ''}
+                  </Text>
+                  {/* Progress bar - calculated from totals */}
+                  <View style={styles.summaryProgressBar}>
+                    <View style={[
+                      styles.summaryProgressFill,
+                      { width: `${totalProgressPercent}%`, backgroundColor: progressColor }
+                    ]} />
+                  </View>
+                  <Text style={[styles.summaryHint, { color: progressColor }]}>
+                    {totalProgressPercent}% del presupuesto total utilizado
+                  </Text>
+                </View>
+              );
+            })()}
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tus Presupuestos</Text>
-              <Text style={styles.sectionSubtitle}>Toca una tarjeta para editar el límite</Text>
-              {loading ? (
+              <Text style={styles.sectionSubtitle}>Gestiona tus presupuestos por tarjeta</Text>
+              {budgetsLoading ? (
                 <ActivityIndicator color={appTheme.colors.primary} />
+              ) : budgets.length === 0 ? (
+                <View style={{ alignItems: 'center', padding: 20 }}>
+                  <Feather name="dollar-sign" size={48} color={appTheme.colors.textSecondary} />
+                  <Text style={[styles.emptyText, { marginTop: 16 }]}>
+                    No tienes presupuestos creados
+                  </Text>
+                  <Text style={styles.hintText}>
+                    Toca el botón + para agregar un nuevo presupuesto
+                  </Text>
+                </View>
               ) : (
                 budgets.map(budget => {
-                  const percent = Math.min((budget.spent / budget.budget) * 100, 100);
-                  let color = appTheme.colors.success;
-                  if (percent > 80) color = appTheme.colors.warning;
-                  if (percent >= 100) color = appTheme.colors.error;
+                  const icon = getBudgetIcon(budget.name);
+                  const progress = budget.porcentajeCumplido || 0;
+                  const montoGastado = (budget.presupuesto * progress) / 100;
+                  let progressColor = appTheme.colors.info;
+                  if (progress >= 75) progressColor = appTheme.colors.success;
+                  else if (progress >= 50) progressColor = appTheme.colors.warning;
 
                   return (
                     <TouchableOpacity
@@ -309,51 +245,40 @@ export default function BudgetsScreen() {
                     >
                       <View style={styles.budgetHeader}>
                         <View style={styles.budgetIconContainer}>
-                          <Feather name={budget.icon as any} size={24} color={color} />
+                          <Feather name={icon as any} size={24} color={progressColor} />
                         </View>
                         <View style={styles.budgetInfo}>
                           <Text style={styles.budgetName}>{budget.name}</Text>
+                          <Text style={styles.budgetDescription}>{budget.description}</Text>
                           <Text style={styles.budgetAmount}>
-                            {formatCurrency(budget.spent)} / {formatCurrency(budget.budget)}
-                          </Text>
-                        </View>
-                        <View style={[styles.percentBadge, { backgroundColor: `${color}20` }]}>
-                          <Text style={[styles.percentText, { color: color }]}>
-                            {percent.toFixed(0)}%
+                            <Text style={{ color: progressColor }}>
+                              {formatCurrency(montoGastado)}
+                            </Text>
+                            <Text style={{ color: appTheme.colors.textSecondary }}> / </Text>
+                            {formatCurrency(budget.presupuesto)}
                           </Text>
                         </View>
                       </View>
-                      <View style={styles.progressBar}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${percent}%`, backgroundColor: color }
-                          ]}
-                        />
+                      {/* Progress bar with percentage */}
+                      <View style={styles.budgetProgressContainer}>
+                        <View style={styles.budgetProgressBar}>
+                          <View
+                            style={[
+                              styles.budgetProgressFill,
+                              { width: `${progress}%`, backgroundColor: progressColor }
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.budgetProgressPercent, { color: progressColor }]}>
+                          {progress}%
+                        </Text>
                       </View>
+                      <Text style={styles.budgetProgressText}>
+                        Toca para actualizar progreso
+                      </Text>
                     </TouchableOpacity>
                   );
                 })
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Últimos Gastos</Text>
-              {transactions.length === 0 ? (
-                <Text style={styles.emptyText}>No hay gastos registrados</Text>
-              ) : (
-                transactions.slice(0, 5).map(tx => (
-                  <View key={tx.id} style={styles.transactionItem}>
-                    <View style={styles.transactionIcon}>
-                      <Feather name="arrow-down-circle" size={24} color={appTheme.colors.error} />
-                    </View>
-                    <View style={styles.transactionContent}>
-                      <Text style={styles.transactionTitle}>{tx.description}</Text>
-                      <Text style={styles.transactionCategory}>{tx.category}</Text>
-                    </View>
-                    <Text style={styles.transactionAmount}>-{formatCurrency(tx.amount)}</Text>
-                  </View>
-                ))
               )}
             </View>
           </>
@@ -361,46 +286,74 @@ export default function BudgetsScreen() {
 
         {activeTab === 'goals' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tus Metas de Ahorro</Text>
-            <Text style={styles.sectionSubtitle}>
-              Progreso basado en ingresos totales: {formatCurrency(totalIncome)}
-            </Text>
+            <Text style={styles.sectionTitle}>Tus Metas</Text>
+            <Text style={styles.sectionSubtitle}>Define y alcanza tus objetivos financieros</Text>
 
-            {goals.map(goal => {
-              const percent = Math.min((goal.savedAmount / goal.targetAmount) * 100, 100);
-              const isCompleted = percent >= 100;
-              const color = isCompleted ? appTheme.colors.success : appTheme.colors.info;
+            {goalsLoading ? (
+              <ActivityIndicator color={appTheme.colors.primary} />
+            ) : goals.length === 0 ? (
+              <View style={{ alignItems: 'center', padding: 20 }}>
+                <Feather name="target" size={48} color={appTheme.colors.textSecondary} />
+                <Text style={[styles.emptyText, { marginTop: 16 }]}>
+                  No tienes metas creadas
+                </Text>
+                <Text style={styles.hintText}>
+                  Toca el botón + para agregar una nueva meta
+                </Text>
+              </View>
+            ) : (
+              goals.map(goal => {
+                const progress = goal.progreso || 0;
+                let color = appTheme.colors.primary;
+                if (progress >= 100) color = appTheme.colors.success;
+                else if (progress > 0) color = appTheme.colors.warning;
+                else color = appTheme.colors.info;
 
-              return (
-                <View key={goal.id} style={styles.goalCard}>
-                  <View style={styles.goalHeader}>
-                    <View style={[styles.goalIconContainer, { backgroundColor: `${color}20` }]}>
-                      <Feather name={goal.icon as any} size={24} color={color} />
-                    </View>
-                    <View style={styles.goalHeaderContent}>
-                      <Text style={styles.goalName}>{goal.name}</Text>
-                      <Text style={styles.goalAmount}>
-                        {formatCurrency(goal.savedAmount)} / {formatCurrency(goal.targetAmount)}
-                      </Text>
-                    </View>
-                    {isCompleted && (
-                      <View style={styles.completedBadge}>
-                        <Feather name="check" size={16} color="#FFF" />
+                return (
+                  <TouchableOpacity
+                    key={goal.id}
+                    style={styles.goalCard}
+                    onPress={() => openEditGoal(goal)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.goalHeader}>
+                      <View style={[styles.goalIconContainer, { backgroundColor: `${color}20` }]}>
+                        <Feather name={progress >= 100 ? 'check-circle' : 'target'} size={24} color={color} />
                       </View>
-                    )}
-                  </View>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${percent}%`, backgroundColor: color }
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.goalProgress}>{percent.toFixed(0)}% completado</Text>
-                </View>
-              );
-            })}
+                      <View style={styles.goalHeaderContent}>
+                        <Text style={styles.goalName}>{goal.name}</Text>
+                        <Text style={styles.goalDescription}>{goal.description}</Text>
+                        {goal.presupuesto && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Feather name="dollar-sign" size={12} color={appTheme.colors.textSecondary} style={{ marginRight: 2 }} />
+                            <Text style={{ fontSize: 12, color: appTheme.colors.textSecondary }}>
+                              {goal.presupuesto.name}: {formatCurrency(goal.presupuesto.presupuesto)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: color }}>
+                          {progress}%
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Progress Bar for Goal */}
+                    <View style={styles.budgetProgressContainer}>
+                      <View style={styles.budgetProgressBar}>
+                        <View
+                          style={[
+                            styles.budgetProgressFill,
+                            { width: `${progress}%`, backgroundColor: color }
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         )}
 
@@ -449,7 +402,7 @@ export default function BudgetsScreen() {
         activeOpacity={0.8}
         onPress={() => {
           if (activeTab === 'budgets') {
-            setModalVisible(true);
+            setBudgetModalVisible(true);
           } else if (activeTab === 'goals') {
             setGoalModalVisible(true);
           } else {
@@ -462,17 +415,17 @@ export default function BudgetsScreen() {
         </View>
       </TouchableOpacity>
 
-      <CreateTransactionModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSubmit={handleCreateTransaction}
+      <AddBudgetModal
+        visible={budgetModalVisible}
+        onClose={() => setBudgetModalVisible(false)}
+        onSubmit={handleCreateBudget}
       />
 
-      <EditBudgetModal
-        visible={editModalVisible}
-        onClose={() => setEditModalVisible(false)}
-        onSubmit={handleUpdateBudget}
-        currentBudget={selectedBudget}
+      <EditBudgetProgressModal
+        visible={editProgressModalVisible}
+        onClose={() => setEditProgressModalVisible(false)}
+        onSubmit={handleUpdateBudgetProgress}
+        budget={selectedBudget}
       />
 
       <GoalModal
@@ -497,6 +450,12 @@ export default function BudgetsScreen() {
         onDelete={() => {
           fetchTasks(); // Refresh task list after deletion
         }}
+      />
+      <EditGoalProgressModal
+        visible={editGoalModalVisible}
+        onClose={() => setEditGoalModalVisible(false)}
+        onSubmit={handleUpdateGoal}
+        goal={selectedGoal}
       />
     </SafeAreaView>
   );
@@ -578,6 +537,25 @@ const styles = StyleSheet.create({
   summarySubtext: {
     fontSize: 13,
     color: appTheme.colors.textSecondary,
+    marginBottom: 12,
+  },
+  summaryProgressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  summaryProgressFill: {
+    height: '100%',
+    backgroundColor: appTheme.colors.primary,
+    borderRadius: 3,
+  },
+  summaryHint: {
+    fontSize: 11,
+    color: appTheme.colors.textSecondary,
+    fontStyle: 'italic',
   },
   hintText: {
     fontSize: 12,
@@ -629,9 +607,54 @@ const styles = StyleSheet.create({
     color: appTheme.colors.text,
     marginBottom: 2,
   },
-  budgetAmount: {
+  budgetDescription: {
     fontSize: 13,
     color: appTheme.colors.textSecondary,
+    marginBottom: 4,
+  },
+  budgetAmount: {
+    fontSize: 14,
+    color: appTheme.colors.primary,
+    fontWeight: '700',
+  },
+  progressBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  progressText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  budgetProgressBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  budgetProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+  },
+  budgetProgressPercent: {
+    fontSize: 14,
+    fontWeight: '700',
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  budgetProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  budgetProgressText: {
+    fontSize: 11,
+    color: appTheme.colors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   percentBadge: {
     paddingHorizontal: 8,
@@ -678,6 +701,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: appTheme.colors.text,
+    marginBottom: 4,
+  },
+  goalDescription: {
+    fontSize: 13,
+    color: appTheme.colors.textSecondary,
     marginBottom: 4,
   },
   goalAmount: {
