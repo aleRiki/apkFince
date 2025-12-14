@@ -102,7 +102,6 @@ export default function BudgetsScreen() {
     const success = await updateGoal(goalId, data);
     if (success) {
       setEditGoalModalVisible(false);
-      fetchGoals();
     }
   };
 
