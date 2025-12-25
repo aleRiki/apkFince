@@ -38,6 +38,8 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
     const [selectedIcon, setSelectedIcon] = useState('target');
     const [selectedPresupuestoId, setSelectedPresupuestoId] = useState<number | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isBudgetDropdownOpen, setIsBudgetDropdownOpen] = useState(false);
 
     // Data for selectors
     const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -46,6 +48,11 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
     const [loadingUsers, setLoadingUsers] = useState(false);
 
     const icons = ['target', 'umbrella', 'sun', 'home', 'gift', 'award'];
+
+    const filteredUsers = users.filter(user =>
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     useEffect(() => {
         if (visible) {
@@ -102,10 +109,6 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
         }
         if (selectedPresupuestoId === null) {
             alert('Por favor selecciona un presupuesto');
-            return;
-        }
-        if (selectedUserIds.length === 0) {
-            alert('Por favor selecciona al menos un usuario');
             return;
         }
 
@@ -187,75 +190,141 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
                                 {loadingBudgets ? (
                                     <ActivityIndicator color={appTheme.colors.primary} />
                                 ) : (
-                                    <View style={styles.optionsList}>
-                                        {budgets.map((budget) => (
-                                            <TouchableOpacity
-                                                key={budget.id}
-                                                style={[
-                                                    styles.optionItem,
-                                                    selectedPresupuestoId === budget.id && styles.selectedOption,
-                                                ]}
-                                                onPress={() => setSelectedPresupuestoId(budget.id)}
-                                            >
-                                                <Feather
-                                                    name="briefcase"
-                                                    size={20}
-                                                    color={selectedPresupuestoId === budget.id ? '#FFF' : appTheme.colors.textSecondary}
-                                                />
-                                                <View style={{ flex: 1 }}>
-                                                    <Text
+                                    <View>
+                                        <TouchableOpacity
+                                            style={styles.dropdownButton}
+                                            onPress={() => setIsBudgetDropdownOpen(!isBudgetDropdownOpen)}
+                                        >
+                                            <Feather name="briefcase" size={20} color={appTheme.colors.textSecondary} />
+                                            <Text style={styles.dropdownButtonText}>
+                                                {selectedPresupuestoId
+                                                    ? budgets.find(b => b.id === selectedPresupuestoId)?.name
+                                                    : 'Seleccionar un presupuesto'}
+                                            </Text>
+                                            <Feather
+                                                name={isBudgetDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                                                size={20}
+                                                color={appTheme.colors.textSecondary}
+                                            />
+                                        </TouchableOpacity>
+
+                                        {isBudgetDropdownOpen && (
+                                            <View style={styles.dropdownContent}>
+                                                {budgets.map((budget) => (
+                                                    <TouchableOpacity
+                                                        key={budget.id}
                                                         style={[
-                                                            styles.optionText,
-                                                            selectedPresupuestoId === budget.id && styles.selectedOptionText,
+                                                            styles.dropdownItem,
+                                                            selectedPresupuestoId === budget.id && styles.selectedDropdownItem,
                                                         ]}
+                                                        onPress={() => {
+                                                            setSelectedPresupuestoId(budget.id);
+                                                            setIsBudgetDropdownOpen(false);
+                                                        }}
                                                     >
-                                                        {budget.name}
-                                                    </Text>
-                                                    <Text
-                                                        style={[
-                                                            styles.optionSubtext,
-                                                            selectedPresupuestoId === budget.id && styles.selectedOptionSubtext,
-                                                        ]}
-                                                    >
-                                                        {budget.description}
-                                                    </Text>
-                                                </View>
-                                            </TouchableOpacity>
-                                        ))}
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text
+                                                                style={[
+                                                                    styles.optionText,
+                                                                    selectedPresupuestoId === budget.id && styles.selectedOptionText,
+                                                                ]}
+                                                            >
+                                                                {budget.name}
+                                                            </Text>
+                                                            <Text
+                                                                style={[
+                                                                    styles.optionSubtext,
+                                                                    selectedPresupuestoId === budget.id && styles.selectedOptionSubtext,
+                                                                ]}
+                                                            >
+                                                                {budget.description}
+                                                            </Text>
+                                                        </View>
+                                                        {selectedPresupuestoId === budget.id && (
+                                                            <Feather name="check" size={18} color="#FFF" />
+                                                        )}
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        )}
                                     </View>
                                 )}
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Usuarios</Text>
+                                <Text style={styles.label}>Usuarios (Opcional)</Text>
+                                <View style={styles.searchContainer}>
+                                    <Feather name="search" size={18} color={appTheme.colors.textSecondary} style={styles.searchIcon} />
+                                    <TextInput
+                                        style={styles.searchInput}
+                                        placeholder="Buscar por nombre o email..."
+                                        placeholderTextColor={appTheme.colors.textSecondary}
+                                        value={searchQuery}
+                                        onChangeText={setSearchQuery}
+                                    />
+                                </View>
+
                                 {loadingUsers ? (
                                     <ActivityIndicator color={appTheme.colors.primary} />
                                 ) : (
                                     <View style={styles.optionsList}>
-                                        {users.map((user) => (
-                                            <TouchableOpacity
-                                                key={user.id}
-                                                style={[
-                                                    styles.optionItem,
-                                                    selectedUserIds.includes(user.id) && styles.selectedOption,
-                                                ]}
-                                                onPress={() => toggleUserSelection(user.id)}
-                                            >
-                                                <Feather
-                                                    name={selectedUserIds.includes(user.id) ? 'check-square' : 'square'}
-                                                    size={20}
-                                                    color={selectedUserIds.includes(user.id) ? '#FFF' : appTheme.colors.textSecondary}
-                                                />
-                                                <Text
-                                                    style={[
-                                                        styles.optionText,
-                                                        selectedUserIds.includes(user.id) && styles.selectedOptionText,
-                                                    ]}
+                                        {/* Usuarios Seleccionados (siempre visibles) */}
+                                        {selectedUserIds.length > 0 && users
+                                            .filter(u => selectedUserIds.includes(u.id))
+                                            .map((user) => (
+                                                <TouchableOpacity
+                                                    key={`selected-${user.id}`}
+                                                    style={[styles.userCard, styles.selectedUserCard]}
+                                                    onPress={() => toggleUserSelection(user.id)}
                                                 >
-                                                    {user.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
+                                                    <View style={[styles.avatar, styles.selectedAvatar]}>
+                                                        <Text style={styles.avatarText}>
+                                                            {user.name.charAt(0).toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.userInfo}>
+                                                        <Text style={[styles.userName, styles.selectedUserName]}>{user.name}</Text>
+                                                        <Text style={[styles.userEmail, styles.selectedUserEmail]}>{user.email}</Text>
+                                                    </View>
+                                                    <View style={styles.selectionIndicator}>
+                                                        <Feather name="check-circle" size={20} color="#FFF" />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            ))
+                                        }
+
+                                        {/* Resultados de Búsqueda (solo si hay query) */}
+                                        {searchQuery.length > 0 && filteredUsers
+                                            .filter(u => !selectedUserIds.includes(u.id))
+                                            .map((user) => (
+                                                <TouchableOpacity
+                                                    key={user.id}
+                                                    style={styles.userCard}
+                                                    onPress={() => toggleUserSelection(user.id)}
+                                                >
+                                                    <View style={styles.avatar}>
+                                                        <Text style={styles.avatarText}>
+                                                            {user.name.charAt(0).toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                    <View style={styles.userInfo}>
+                                                        <Text style={styles.userName}>{user.name}</Text>
+                                                        <Text style={styles.userEmail}>{user.email}</Text>
+                                                    </View>
+                                                    <View style={styles.selectionIndicator}>
+                                                        <Feather name="plus-circle" size={20} color={appTheme.colors.textSecondary} />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            ))
+                                        }
+
+                                        {searchQuery.length > 0 && filteredUsers.length === 0 && (
+                                            <Text style={styles.infoText}>No se encontraron usuarios</Text>
+                                        )}
+
+                                        {searchQuery.length === 0 && selectedUserIds.length === 0 && (
+                                            <Text style={styles.infoText}>Comienza a escribir para buscar usuarios...</Text>
+                                        )}
                                     </View>
                                 )}
                             </View>
@@ -386,5 +455,123 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 16,
         fontWeight: '700',
+    },
+    dropdownButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+    },
+    dropdownButtonText: {
+        flex: 1,
+        fontSize: 16,
+        color: appTheme.colors.text,
+    },
+    dropdownContent: {
+        marginTop: 8,
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+        overflow: 'hidden',
+    },
+    dropdownItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        gap: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(148, 163, 184, 0.05)',
+    },
+    selectedDropdownItem: {
+        backgroundColor: appTheme.colors.primary,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+        marginBottom: 8,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        height: 48,
+        color: appTheme.colors.text,
+        fontSize: 16,
+    },
+    infoText: {
+        fontSize: 12,
+        color: appTheme.colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 8,
+        fontStyle: 'italic',
+    },
+    userCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(148, 163, 184, 0.05)',
+        borderRadius: 16,
+        padding: 12,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.1)',
+        marginBottom: 8,
+    },
+    selectedUserCard: {
+        backgroundColor: appTheme.colors.primary,
+        borderColor: appTheme.colors.primary,
+    },
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: appTheme.colors.backgroundCard,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.1)',
+    },
+    selectedAvatar: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'transparent',
+    },
+    avatarText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: appTheme.colors.primary,
+    },
+    selectedAvatarText: {
+        color: '#FFF',
+    },
+    userInfo: {
+        flex: 1,
+    },
+    userName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: appTheme.colors.text,
+    },
+    selectedUserName: {
+        color: '#FFF',
+    },
+    userEmail: {
+        fontSize: 12,
+        color: appTheme.colors.textSecondary,
+    },
+    selectedUserEmail: {
+        color: 'rgba(255, 255, 255, 0.8)',
+    },
+    selectionIndicator: {
+        padding: 4,
     },
 });
