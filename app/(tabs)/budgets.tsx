@@ -12,6 +12,7 @@ import { useGoals } from '@/hooks/useGoals';
 import { useTasks } from '@/hooks/useTasks';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -235,13 +236,18 @@ export default function BudgetsScreen() {
               else if (totalProgressPercent >= 50) progressColor = appTheme.colors.warning;
 
               return (
-                <View style={styles.summaryCard}>
+                <LinearGradient
+                  colors={['#334155', '#1E293B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.summaryCard}
+                >
                   <Text style={styles.summaryLabel}>Total Presupuesto Asignado</Text>
                   <Text style={styles.summaryAmount}>
                     <Text style={{ color: progressColor }}>
                       {formatCurrency(totalGastado)}
                     </Text>
-                    <Text style={{ color: appTheme.colors.textSecondary }}> / </Text>
+                    <Text style={{ color: appTheme.colors.textSecondary, fontSize: 20 }}> / </Text>
                     {formatCurrency(totalPresupuesto)}
                   </Text>
                   <Text style={styles.summarySubtext}>
@@ -254,10 +260,15 @@ export default function BudgetsScreen() {
                       { width: `${totalProgressPercent}%`, backgroundColor: progressColor }
                     ]} />
                   </View>
-                  <Text style={[styles.summaryHint, { color: progressColor }]}>
-                    {totalProgressPercent}% del presupuesto total utilizado
-                  </Text>
-                </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 4 }}>
+                    <Text style={[styles.summaryHint, { color: progressColor }]}>
+                      {totalProgressPercent}% utilizado
+                    </Text>
+                    <Text style={styles.summaryHint}>
+                      Restante: {formatCurrency(totalPresupuesto - totalGastado)}
+                    </Text>
+                  </View>
+                </LinearGradient>
               );
             })()}
 
@@ -298,41 +309,54 @@ export default function BudgetsScreen() {
                       onPress={() => handleBudgetPress(budget)}
                     >
                       <View style={styles.budgetHeader}>
-                        <View style={styles.budgetIconContainer}>
-                          <Feather name={isCompleted ? "check-circle" : icon as any} size={24} color={progressColor} />
+                        <View style={[styles.budgetIconContainer, { backgroundColor: isCompleted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)' }]}>
+                          <Feather name={isCompleted ? "check" : icon as any} size={24} color={progressColor} />
                         </View>
                         <View style={styles.budgetInfo}>
                           <Text style={[
                             styles.budgetName,
                             isCompleted && { textDecorationLine: 'line-through', color: appTheme.colors.textSecondary }
                           ]}>{budget.name}</Text>
-                          <Text style={styles.budgetDescription}>{budget.description}</Text>
-                          <Text style={styles.budgetAmount}>
-                            <Text style={{ color: progressColor }}>
-                              {formatCurrency(montoGastado)}
-                            </Text>
-                            <Text style={{ color: appTheme.colors.textSecondary }}> / </Text>
+                          <Text style={styles.budgetDescription} numberOfLines={1}>{budget.description}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={[styles.budgetPercent, { color: progressColor }]}>{progress}%</Text>
+                        </View>
+                      </View>
+
+                      <View style={{ marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+                          <Text style={{ color: appTheme.colors.textSecondary, fontSize: 12 }}>Gastado</Text>
+                          <Text style={{ color: appTheme.colors.textSecondary, fontSize: 12 }}>Total</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <Text style={styles.budgetAmountSpent}>
+                            {formatCurrency(montoGastado)}
+                          </Text>
+                          <Text style={styles.budgetAmountTotal}>
                             {formatCurrency(budget.presupuesto)}
                           </Text>
                         </View>
                       </View>
-                      {/* Progress bar with percentage */}
-                      <View style={styles.budgetProgressContainer}>
-                        <View style={styles.budgetProgressBar}>
-                          <View
-                            style={[
-                              styles.budgetProgressFill,
-                              { width: `${progress}%`, backgroundColor: progressColor }
-                            ]}
-                          />
-                        </View>
-                        <Text style={[styles.budgetProgressPercent, { color: progressColor }]}>
-                          {progress}%
+
+                      {/* Progress Bar */}
+                      <View style={styles.budgetProgressBar}>
+                        <View
+                          style={[
+                            styles.budgetProgressFill,
+                            { width: `${Math.min(progress, 100)}%`, backgroundColor: progressColor }
+                          ]}
+                        />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                        <Text style={{ color: appTheme.colors.textSecondary, fontSize: 11 }}>
+                          {isCompleted ? 'Completado' : 'Disponible:'} <Text style={{ color: appTheme.colors.text, fontWeight: '600' }}>{formatCurrency(Math.max(0, budget.presupuesto - montoGastado))}</Text>
+                        </Text>
+                        <Text style={[styles.progressHint, { textAlign: 'right' }]}>
+                          {isCompleted ? '✅ Listo' : 'Actualizar'}
                         </Text>
                       </View>
-                      <Text style={styles.budgetProgressText}>
-                        Toca para actualizar progreso
-                      </Text>
                     </TouchableOpacity>
                   );
                 })
@@ -574,40 +598,49 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginHorizontal: 20,
-    backgroundColor: appTheme.colors.backgroundCard,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   summaryLabel: {
     fontSize: 14,
     color: appTheme.colors.textSecondary,
     marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '600',
   },
   summaryAmount: {
-    fontSize: 28,
-    fontWeight: '900',
+    fontSize: 32,
+    fontWeight: '800',
     color: appTheme.colors.text,
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
   summarySubtext: {
-    fontSize: 13,
+    fontSize: 14,
     color: appTheme.colors.textSecondary,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   summaryProgressBar: {
     width: '100%',
-    height: 6,
-    backgroundColor: 'rgba(148, 163, 184, 0.2)',
-    borderRadius: 3,
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
   },
   summaryProgressFill: {
     height: '100%',
-    backgroundColor: appTheme.colors.primary,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   summaryHint: {
     fontSize: 11,
@@ -637,9 +670,16 @@ const styles = StyleSheet.create({
   },
   budgetCard: {
     backgroundColor: appTheme.colors.backgroundCard,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   budgetHeader: {
     flexDirection: 'row',
@@ -669,49 +709,43 @@ const styles = StyleSheet.create({
     color: appTheme.colors.textSecondary,
     marginBottom: 4,
   },
-  budgetAmount: {
-    fontSize: 14,
-    color: appTheme.colors.primary,
-    fontWeight: '700',
+  budgetAmountSpent: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: appTheme.colors.text,
+    letterSpacing: -0.5,
   },
-  progressBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+  budgetAmountTotal: {
+    fontSize: 16,
+    color: appTheme.colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  progressText: {
-    fontSize: 13,
-    fontWeight: '700',
+  budgetPercent: {
+    fontSize: 18,
+    fontWeight: '800',
   },
   budgetProgressBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: 'rgba(148, 163, 184, 0.2)',
-    borderRadius: 3,
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
     overflow: 'hidden',
+  },
+  budgetProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressHint: { // Ensuring progressHint exists to fix lint error
+    fontSize: 11,
+    color: appTheme.colors.primary,
+    fontWeight: '600',
   },
   budgetProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginTop: 12,
-  },
-  budgetProgressPercent: {
-    fontSize: 14,
-    fontWeight: '700',
-    minWidth: 40,
-    textAlign: 'right',
-  },
-  budgetProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  budgetProgressText: {
-    fontSize: 11,
-    color: appTheme.colors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
   percentBadge: {
     paddingHorizontal: 8,
