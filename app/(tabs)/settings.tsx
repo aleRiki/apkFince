@@ -7,8 +7,10 @@ import { useUser } from '@/hooks/useUser';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
+    Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -22,11 +24,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function SettingsScreen() {
     const { user, logout } = useAuth();
     const { userData, loading, updateUserData } = useUser();
+    const { t, i18n } = useTranslation();
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
     const [biometricsEnabled, setBiometricsEnabled] = React.useState(false);
     const [editModalVisible, setEditModalVisible] = React.useState(false);
     const [helpModalVisible, setHelpModalVisible] = React.useState(false);
     const [aboutModalVisible, setAboutModalVisible] = React.useState(false);
+
+    const toggleLanguage = () => {
+        const newLang = i18n.language === 'es' ? 'en' : 'es';
+        Alert.alert(
+            t('settings.language'),
+            `${t('common.active')}: ${t(`settings.language_${i18n.language}`)}`,
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: i18n.language === 'es' ? 'Switch to English' : 'Cambiar a Español',
+                    onPress: () => i18n.changeLanguage(newLang)
+                }
+            ]
+        );
+    };
 
     const handleLogout = () => {
         logout();
@@ -72,7 +90,7 @@ export default function SettingsScreen() {
             <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
 
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Configuración</Text>
+                <Text style={styles.headerTitle}>{t('settings.title')}</Text>
             </View>
 
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -88,7 +106,7 @@ export default function SettingsScreen() {
                                 </Text>
                             </View>
                             <View style={styles.profileInfo}>
-                                <Text style={styles.userName}>{userData?.name || user?.name || 'Usuario'}</Text>
+                                <Text style={styles.userName}>{userData?.name || user?.name || t('settings.profile')}</Text>
                                 <Text style={styles.userEmail}>{userData?.email || user?.email || 'usuario@email.com'}</Text>
                                 {userData?.role && (
                                     <Text style={styles.userRole}>
@@ -104,12 +122,12 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* General Settings */}
-                <Text style={styles.sectionHeader}>General</Text>
+                <Text style={styles.sectionHeader}>{t('settings.general')}</Text>
                 <View style={styles.section}>
                     <SettingItem
                         icon="bell"
-                        title="Notificaciones"
-                        subtitle="Alertas de gastos y metas"
+                        title={t('settings.notifications')}
+                        subtitle={t('settings.notifications_desc')}
                         rightElement={
                             <Switch
                                 value={notificationsEnabled}
@@ -121,8 +139,8 @@ export default function SettingsScreen() {
                     />
                     <SettingItem
                         icon="shield"
-                        title="Seguridad"
-                        subtitle="Biometría y contraseña"
+                        title={t('settings.security')}
+                        subtitle={t('settings.security_desc')}
                         rightElement={
                             <Switch
                                 value={biometricsEnabled}
@@ -134,23 +152,24 @@ export default function SettingsScreen() {
                     />
                     <SettingItem
                         icon="globe"
-                        title="Idioma"
-                        subtitle="Español"
+                        title={t('settings.language')}
+                        subtitle={t(`settings.language_${i18n.language}`)}
+                        onPress={toggleLanguage}
                     />
                 </View>
 
                 {/* Support */}
-                <Text style={styles.sectionHeader}>Soporte</Text>
+                <Text style={styles.sectionHeader}>{t('settings.support')}</Text>
                 <View style={styles.section}>
                     <SettingItem
                         icon="help-circle"
-                        title="Ayuda y Soporte"
+                        title={t('settings.help')}
                         onPress={() => setHelpModalVisible(true)}
                     />
                     <SettingItem
                         icon="info"
-                        title="Acerca de"
-                        subtitle="Versión 1.0.0"
+                        title={t('settings.about')}
+                        subtitle={`${t('settings.version')} 1.0.0`}
                         onPress={() => setAboutModalVisible(true)}
                     />
                 </View>
@@ -158,7 +177,7 @@ export default function SettingsScreen() {
                 {/* Logout */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                     <Feather name="log-out" size={20} color={appTheme.colors.error} />
-                    <Text style={styles.logoutText}>Cerrar Sesión</Text>
+                    <Text style={styles.logoutText}>{t('settings.logout')}</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 40 }} />

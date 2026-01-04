@@ -1,0 +1,36 @@
+{
+    "common": {
+        "loading": "Cargando...",
+        "error": "Error",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "delete": "Eliminar",
+        "edit": "Editar",
+        "create": "Crear",
+        "search": "Buscar"
+    },
+    "settings": {
+        "title": "Configuración",
+        "profile": "Perfil",
+        "general": "General",
+        "notifications": "Notificaciones",
+        "notifications_desc": "Alertas de gastos y metas",
+        "security": "Seguridad",
+        "security_desc": "Biometría y contraseña",
+        "language": "Idioma",
+        "language_es": "Español",
+        "language_en": "Inglés",
+        "support": "Soporte",
+        "help": "Ayuda y Soporte",
+        "about": "Acerca de",
+        "version": "Versión",
+        "logout": "Cerrar Sesión"
+    },
+    "tabs": {
+        "home": "Inicio",
+        "accounts": "Cuentas",
+        "budgets": "Presupuestos",
+        "analytics": "Análisis",
+        "settings": "Configuración"
+    }
+}

@@ -2,8 +2,10 @@ import { appTheme } from '@/constants/appTheme';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={{
@@ -27,28 +29,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Inicio',
+          title: t('tabs.home'),
           tabBarIcon: ({ color }) => <Feather name="home" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="accounts"
         options={{
-          title: 'Cuentas',
+          title: t('tabs.accounts'),
           tabBarIcon: ({ color }) => <Feather name="credit-card" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="budgets"
         options={{
-          title: 'Presupuestos',
+          title: t('tabs.budgets'),
           tabBarIcon: ({ color }) => <Feather name="pie-chart" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="analytics"
         options={{
-          title: 'Análisis',
+          title: t('tabs.analytics'),
           tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={24} color={color} />,
         }}
       />
@@ -61,7 +63,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Configuración',
+          title: t('tabs.settings'),
           tabBarIcon: ({ color }) => <Feather name="settings" size={24} color={color} />,
         }}
       />

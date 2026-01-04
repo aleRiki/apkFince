@@ -1,0 +1,36 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "error": "Error",
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "create": "Create",
+        "search": "Search"
+    },
+    "settings": {
+        "title": "Settings",
+        "profile": "Profile",
+        "general": "General",
+        "notifications": "Notifications",
+        "notifications_desc": "Expense and goal alerts",
+        "security": "Security",
+        "security_desc": "Biometrics and password",
+        "language": "Language",
+        "language_es": "Spanish",
+        "language_en": "English",
+        "support": "Support",
+        "help": "Help & Support",
+        "about": "About",
+        "version": "Version",
+        "logout": "Log Out"
+    },
+    "tabs": {
+        "home": "Home",
+        "accounts": "Accounts",
+        "budgets": "Budgets",
+        "analytics": "Analytics",
+        "settings": "Settings"
+    }
+}
