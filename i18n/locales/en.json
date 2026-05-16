@@ -31,6 +31,8 @@
         "accounts": "Accounts",
         "budgets": "Budgets",
         "analytics": "Analytics",
+        "rates": "Exchange",
+        "sumbank": "Banks",
         "settings": "Settings"
     }
 }

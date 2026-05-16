@@ -1,5 +1,6 @@
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { api } from '@/services/api';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface Account {
   id: string;
@@ -26,7 +27,7 @@ export const useAccounts = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.get('/api/v1/accounts');
@@ -74,11 +75,13 @@ export const useAccounts = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [fetchAccounts]);
+
+  useAutoRefresh(fetchAccounts, 30000);
 
   return { accounts, loading, error, refetch: fetchAccounts };
 };

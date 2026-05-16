@@ -55,9 +55,23 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="tasacambio"
+        options={{
+          title: t('tabs.rates'),
+          tabBarIcon: ({ color }) => <Feather name="dollar-sign" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="sumbank"
+        options={{
+          title: t('tabs.sumbank'),
+          tabBarIcon: ({ color }) => <Feather name="shield" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
-          href: null, // Hide from tabs
+          href: null,
         }}
       />
       <Tabs.Screen
