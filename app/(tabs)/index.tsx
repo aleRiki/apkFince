@@ -6,11 +6,13 @@ import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { mockBudgets } from '@/constants/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useCards } from '@/hooks/useCards';
+import { useTasasCambio } from '@/hooks/useTasasCambio';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   RefreshControl,
@@ -70,6 +72,26 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [weeklyChange, setWeeklyChange] = useState(0);
+  const { cards, refetch: refetchCards } = useCards();
+  const { rates, refetch: refetchRates } = useTasasCambio();
+
+  const rateMap = useMemo(() => {
+    const map: Record<string, number> = { USD: 1 };
+    rates.forEach(r => { map[r.currency] = r.rate; });
+    return map;
+  }, [rates]);
+
+  const totalCardBalanceUSD = useMemo(() => {
+    let total = 0;
+    cards.forEach(card => {
+      const account = accounts.find(a => String(a.id) === String(card.account?.id));
+      if (account) {
+        const rate = rateMap[account.currency || 'USD'] || 1;
+        total += account.balance * rate;
+      }
+    });
+    return total;
+  }, [cards, accounts, rateMap]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -155,7 +177,7 @@ export default function HomeScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchData();
+    await Promise.all([fetchData(), refetchCards(), refetchRates()]);
     setRefreshing(false);
   };
 
@@ -205,14 +227,25 @@ export default function HomeScreen() {
         </FadeInView>
 
         <FadeInView delay={100}>
-          <LinearGradient
+            <LinearGradient
             colors={['#0EA5A4', '#0D8F8E']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.balanceCard}
           >
-            <Text style={styles.balanceLabel}>Saldo Total Consolidado</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(totalBalance)}</Text>
+            <Text style={styles.balanceLabel}>Saldo en Tarjetas (USD)</Text>
+            <Text style={styles.balanceAmount}>
+              ${totalCardBalanceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            {rates.length > 0 && (
+              <View style={styles.rateRow}>
+                {rates.map(r => (
+                  <Text key={r.currency} style={styles.rateBadge}>
+                    1 {r.currency} = ${Number(r.rate).toFixed(4)}
+                  </Text>
+                ))}
+              </View>
+            )}
             <View style={styles.balanceBadge}>
               <Feather name={weeklyChange >= 0 ? 'trending-up' : 'trending-down'} size={14} color={weeklyChange >= 0 ? '#10B981' : '#EF4444'} />
               <Text style={styles.balanceBadgeText}>
@@ -363,6 +396,8 @@ const styles = StyleSheet.create({
   balanceAmount: { fontSize: 36, fontWeight: '900', color: '#FFF', marginBottom: 12 },
   balanceBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start' },
   balanceBadgeText: { fontSize: 12, fontWeight: '600', color: '#FFF', marginLeft: 4 },
+  rateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  rateBadge: { fontSize: 10, color: '#FFF', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, fontWeight: '600' },
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: appTheme.colors.text },

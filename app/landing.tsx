@@ -101,7 +101,7 @@ export default function LandingScreen() {
 
             <Text style={styles.devCredit}>
               Desarrollado por{' '}
-              <Text style={styles.devName}>Leandro R. R.</Text>
+              <Text style={styles.devName}>Alejandro Ricardo .R</Text>
             </Text>
           </Animated.View>
         </View>
