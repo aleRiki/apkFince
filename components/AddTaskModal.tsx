@@ -1,4 +1,4 @@
-import { appTheme } from '@/constants/appTheme';
+import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
@@ -20,18 +20,29 @@ interface User {
     email: string;
 }
 
+interface Budget {
+    id: number;
+    name: string;
+    presupuesto: number;
+    porcentajeCumplido?: number;
+}
+
+interface TaskType {
+    id: number;
+    name: string;
+}
+
 interface AddTaskModalProps {
     visible: boolean;
     onClose: () => void;
-    onSubmit: (task: { title: string; category: string; userIds: number[] }) => void;
+    onSubmit: (task: { title: string; type: string; presupuestoId: number; userIds: number[] }) => void;
 }
 
-const CATEGORIES = [
-    { id: 'shopping', label: 'Compras', icon: 'shopping-cart' },
-    { id: 'bills', label: 'Pagos/Servicios', icon: 'file-text' },
-    { id: 'personal', label: 'Personal', icon: 'user' },
-    { id: 'home', label: 'Hogar', icon: 'home' },
-    { id: 'other', label: 'Otro', icon: 'more-horizontal' },
+const PREDEFINED_TYPES = [
+    'compras',
+    'pagos de servicios',
+    'personal',
+    'hogar',
 ];
 
 export const AddTaskModal: React.FC<AddTaskModalProps> = ({
@@ -40,19 +51,27 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     onSubmit,
 }) => {
     const [title, setTitle] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('shopping');
+    const [selectedType, setSelectedType] = useState('compras');
+    const [selectedPresupuestoId, setSelectedPresupuestoId] = useState<number | null>(null);
+    const [customTypes, setCustomTypes] = useState<TaskType[]>([]);
 
-    // User search state
     const [searchQuery, setSearchQuery] = useState('');
     const [users, setUsers] = useState<User[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+    const [budgets, setBudgets] = useState<Budget[]>([]);
+    const [loadingBudgets, setLoadingBudgets] = useState(false);
     const [loadingUsers, setLoadingUsers] = useState(false);
     const [showUserSearch, setShowUserSearch] = useState(false);
+    const [showBudgetPicker, setShowBudgetPicker] = useState(false);
 
     useEffect(() => {
-        if (visible && showUserSearch) {
-            fetchUsers();
+        if (visible) {
+            fetchBudgets();
+            fetchCustomTypes();
+            if (showUserSearch) {
+                fetchUsers();
+            }
         }
     }, [visible, showUserSearch]);
 
@@ -67,6 +86,30 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             setFilteredUsers(users);
         }
     }, [searchQuery, users]);
+
+    const fetchBudgets = async () => {
+        setLoadingBudgets(true);
+        try {
+            const data = await api.get('/api/v1/presupuesto');
+            setBudgets(data);
+            if (data.length > 0 && !selectedPresupuestoId) {
+                setSelectedPresupuestoId(data[0].id);
+            }
+        } catch (error) {
+            console.error('Error fetching budgets:', error);
+        } finally {
+            setLoadingBudgets(false);
+        }
+    };
+
+    const fetchCustomTypes = async () => {
+        try {
+            const data = await api.get('/api/v1/task-type');
+            setCustomTypes(data);
+        } catch (error) {
+            console.error('Error fetching task types:', error);
+        }
+    };
 
     const fetchUsers = async () => {
         setLoadingUsers(true);
@@ -96,10 +139,15 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             Alert.alert('Error', 'Por favor ingresa un título para la tarea');
             return;
         }
+        if (selectedPresupuestoId === null) {
+            Alert.alert('Error', 'Por favor selecciona un presupuesto');
+            return;
+        }
 
         onSubmit({
             title: title.trim(),
-            category: selectedCategory,
+            type: selectedType,
+            presupuestoId: selectedPresupuestoId,
             userIds: selectedUserIds
         });
 
@@ -108,12 +156,16 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
     const handleClose = () => {
         setTitle('');
-        setSelectedCategory('shopping');
+        setSelectedType('compras');
+        setSelectedPresupuestoId(null);
         setSearchQuery('');
         setSelectedUserIds([]);
         setShowUserSearch(false);
+        setShowBudgetPicker(false);
         onClose();
     };
+
+    const allTypes = [...PREDEFINED_TYPES, ...customTypes.map(t => t.name)];
 
     return (
         <Modal
@@ -144,31 +196,89 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Categoría</Text>
-                            <View style={styles.categoryGrid}>
-                                {CATEGORIES.map(cat => (
+                            <Text style={styles.label}>Presupuesto</Text>
+                            {loadingBudgets ? (
+                                <ActivityIndicator color={appTheme.colors.primary} />
+                            ) : (
+                                <View>
                                     <TouchableOpacity
-                                        key={cat.id}
-                                        style={[
-                                            styles.categoryButton,
-                                            selectedCategory === cat.id && styles.categoryButtonActive
-                                        ]}
-                                        onPress={() => setSelectedCategory(cat.id)}
+                                        style={styles.dropdownButton}
+                                        onPress={() => setShowBudgetPicker(!showBudgetPicker)}
                                     >
+                                        <Feather name="briefcase" size={20} color={appTheme.colors.textSecondary} />
+                                        <Text style={styles.dropdownButtonText}>
+                                            {selectedPresupuestoId
+                                                ? budgets.find(b => b.id === selectedPresupuestoId)?.name || 'Seleccionar'
+                                                : 'Seleccionar presupuesto'}
+                                        </Text>
                                         <Feather
-                                            name={cat.icon as any}
+                                            name={showBudgetPicker ? 'chevron-up' : 'chevron-down'}
                                             size={20}
-                                            color={selectedCategory === cat.id ? '#FFF' : appTheme.colors.textSecondary}
+                                            color={appTheme.colors.textSecondary}
                                         />
+                                    </TouchableOpacity>
+
+                                    {showBudgetPicker && (
+                                        <View style={styles.dropdownContent}>
+                                            {budgets.map((budget) => (
+                                                <TouchableOpacity
+                                                    key={budget.id}
+                                                    style={[
+                                                        styles.dropdownItem,
+                                                        selectedPresupuestoId === budget.id && styles.selectedDropdownItem,
+                                                    ]}
+                                                    onPress={() => {
+                                                        setSelectedPresupuestoId(budget.id);
+                                                        setShowBudgetPicker(false);
+                                                    }}
+                                                >
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={[styles.optionText, selectedPresupuestoId === budget.id && styles.selectedOptionText]}>
+                                                            {budget.name}
+                                                        </Text>
+                                                        <Text style={[styles.optionSubtext, selectedPresupuestoId === budget.id && styles.selectedOptionSubtext]}>
+                                                            {(() => {
+                                                                const montoGastado = (budget.presupuesto * (budget.porcentajeCumplido || 0)) / 100;
+                                                                return `Disp: ${formatCurrency(Math.max(0, budget.presupuesto - montoGastado))} / ${formatCurrency(budget.presupuesto)}`;
+                                                            })()}
+                                                        </Text>
+                                                    </View>
+                                                    {selectedPresupuestoId === budget.id && (
+                                                        <Feather name="check" size={18} color="#FFF" />
+                                                    )}
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Tipo de tarea</Text>
+                            <FlatList
+                                data={allTypes}
+                                keyExtractor={item => item}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 8 }}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.typeButton,
+                                            selectedType === item && styles.typeButtonActive
+                                        ]}
+                                        onPress={() => setSelectedType(item)}
+                                    >
                                         <Text style={[
-                                            styles.categoryText,
-                                            selectedCategory === cat.id && styles.categoryTextActive
+                                            styles.typeText,
+                                            selectedType === item && styles.typeTextActive
                                         ]}>
-                                            {cat.label}
+                                            {item.charAt(0).toUpperCase() + item.slice(1)}
                                         </Text>
                                     </TouchableOpacity>
-                                ))}
-                            </View>
+                                )}
+                            />
                         </View>
 
                         <View style={styles.inputGroup}>
@@ -291,32 +401,75 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(148, 163, 184, 0.1)',
     },
-    categoryGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    categoryButton: {
+    dropdownButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+    },
+    dropdownButtonText: {
+        flex: 1,
+        fontSize: 16,
+        color: appTheme.colors.text,
+    },
+    dropdownContent: {
+        marginTop: 8,
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+        overflow: 'hidden',
+    },
+    dropdownItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        gap: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(148, 163, 184, 0.05)',
+    },
+    selectedDropdownItem: {
+        backgroundColor: appTheme.colors.primary,
+    },
+    optionText: {
+        fontSize: 16,
+        color: appTheme.colors.text,
+        flex: 1,
+    },
+    selectedOptionText: {
+        color: '#FFF',
+        fontWeight: '600',
+    },
+    optionSubtext: {
+        fontSize: 12,
+        color: appTheme.colors.textSecondary,
+        marginTop: 2,
+    },
+    selectedOptionSubtext: {
+        color: 'rgba(255,255,255,0.8)',
+    },
+    typeButton: {
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 10,
         borderRadius: 12,
         backgroundColor: appTheme.colors.backgroundCard,
         borderWidth: 1,
         borderColor: 'rgba(148, 163, 184, 0.1)',
     },
-    categoryButtonActive: {
+    typeButtonActive: {
         backgroundColor: appTheme.colors.primary,
         borderColor: appTheme.colors.primary,
     },
-    categoryText: {
+    typeText: {
         fontSize: 14,
         fontWeight: '600',
         color: appTheme.colors.textSecondary,
     },
-    categoryTextActive: {
+    typeTextActive: {
         color: '#FFF',
     },
     buttonContainer: {

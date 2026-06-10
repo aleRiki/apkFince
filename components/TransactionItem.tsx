@@ -20,6 +20,18 @@ const categoryIcons: Record<string, string> = {
   ocio: 'smile',
   hogar: 'home',
   otros: 'more-horizontal',
+  other_expense: 'arrow-down-left',
+  other_income: 'arrow-up-right',
+  food_groceries: 'shopping-cart',
+  rent: 'home',
+  entertainment: 'smile',
+  transportation: 'truck',
+  utilities_electricity: 'zap',
+  utilities_phone: 'phone',
+  utilities_internet: 'wifi',
+  debt_payment: 'credit-card',
+  health_care: 'activity',
+  shopping: 'shopping-bag',
 };
 
 const getCategoryColor = (category: string): string => {

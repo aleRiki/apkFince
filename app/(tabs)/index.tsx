@@ -1,10 +1,8 @@
 import AccountCard from '@/components/AccountCard';
 import BudgetProgress from '@/components/BudgetProgress';
-import LogoutButton from '@/components/LogoutButton';
 import TransactionItem from '@/components/TransactionItem';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { mockBudgets } from '@/constants/mockData';
-import { useAuth } from '@/contexts/AuthContext';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { useCards } from '@/hooks/useCards';
 import { useTasasCambio } from '@/hooks/useTasasCambio';
@@ -66,7 +64,6 @@ function FadeInView({ children, delay = 0, style }: { children: any; delay?: num
 
 
 export default function HomeScreen() {
-  const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,13 +136,15 @@ export default function HomeScreen() {
         .map((tx: any) => {
           const isDeposit = tx.transactionType === 'deposit';
           const amount = parseFloat(tx.amount) || 0;
+          const cardInfo = tx.card?.number ? ` (${tx.card.number})` : '';
+          const accountInfo = tx.card?.account?.name ? ` · ${tx.card.account.name}` : '';
           return {
             id: tx.id,
             category: tx.category || 'general',
             name: tx.description || 'Transacción',
-            description: tx.notes || '',
+            description: (tx.notes || '') + cardInfo + accountInfo,
             amount: isDeposit ? Math.abs(amount) : -Math.abs(amount),
-            date: tx.date || new Date().toISOString(),
+            date: tx.createAt || tx.createdAt || new Date().toISOString(),
             type: isDeposit ? 'income' : 'expense',
           };
         });
@@ -184,15 +183,15 @@ export default function HomeScreen() {
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
   const validTransactions = transactions.filter(t => t && t.date && t.type);
 
-  const weeklyIncome = validTransactions
-    .filter(t => { const d = new Date(t.date); const w = new Date(); w.setDate(w.getDate() - 7); return t.type === 'income' && d >= w; })
+  const totalIncome = validTransactions
+    .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-  const weeklyExpenses = validTransactions
-    .filter(t => { const d = new Date(t.date); const w = new Date(); w.setDate(w.getDate() - 7); return t.type === 'expense' && d >= w; })
+  const totalExpenses = validTransactions
+    .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-  const weeklyProgress = weeklyIncome > 0 ? (weeklyExpenses / weeklyIncome) * 100 : 0;
+  const totalProgress = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -204,26 +203,9 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={appTheme.colors.primary} />}
       >
         <FadeInView>
-          <View style={styles.header}>
-            <View style={styles.userInfo}>
-              <View style={styles.avatarContainer}>
-                <Feather name="user" size={24} color={appTheme.colors.primary} />
-              </View>
-              <View style={styles.userDetails}>
-                <Text style={styles.userEmail}>{user?.email || 'usuario@email.com'}</Text>
-                <Text style={styles.subtitle}>Panel de Control Familiar</Text>
-              </View>
-            </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity onPress={handleRefresh} style={styles.iconButton} disabled={loading}>
-                <Feather name="refresh-cw" size={22} color={loading ? appTheme.colors.textSecondary : appTheme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
-                <Feather name="bell" size={22} color={appTheme.colors.text} />
-              </TouchableOpacity>
-              <LogoutButton />
-            </View>
-          </View>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshFab} disabled={loading}>
+            <Feather name="refresh-cw" size={20} color={loading ? appTheme.colors.textSecondary : appTheme.colors.primary} />
+          </TouchableOpacity>
         </FadeInView>
 
         <FadeInView delay={100}>
@@ -288,9 +270,6 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Mis Cuentas</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/accounts')}>
-                <Text style={styles.seeAll}>Ver todo</Text>
-              </TouchableOpacity>
             </View>
             {accounts.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountsScroll}>
@@ -321,19 +300,19 @@ export default function HomeScreen() {
               <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Gastos</Text>
-                  <Text style={[styles.summaryAmount, styles.expenseAmount]}>{formatCurrency(weeklyExpenses)}</Text>
+                  <Text style={[styles.summaryAmount, styles.expenseAmount]}>{formatCurrency(totalExpenses)}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Ingresos</Text>
-                  <Text style={[styles.summaryAmount, styles.incomeAmount]}>{formatCurrency(weeklyIncome)}</Text>
+                  <Text style={[styles.summaryAmount, styles.incomeAmount]}>{formatCurrency(totalIncome)}</Text>
                 </View>
               </View>
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${Math.min(weeklyProgress, 100)}%` }]} />
+                  <View style={[styles.progressFill, { width: `${Math.min(totalProgress, 100)}%` }]} />
                 </View>
-                <Text style={styles.progressText}>{weeklyProgress.toFixed(0)}% del ingreso gastado</Text>
+                <Text style={styles.progressText}>{totalProgress.toFixed(0)}% del ingreso gastado</Text>
               </View>
             </View>
           </View>
@@ -343,13 +322,10 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Actividad Reciente</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAll}>Ver todo</Text>
-              </TouchableOpacity>
             </View>
             {validTransactions.length > 0 ? (
               <View>
-                {validTransactions.slice(0, 3).map(transaction => (
+                {validTransactions.slice(0, 10).map(transaction => (
                   <TransactionItem
                     key={transaction.id}
                     category={transaction.category}
@@ -371,11 +347,7 @@ export default function HomeScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8} onPress={() => {}}>
-        <LinearGradient colors={['#10B981', '#059669']} style={styles.fabGradient}>
-          <Feather name="plus" size={28} color="#FFF" />
-        </LinearGradient>
-      </TouchableOpacity>
+
     </SafeAreaView>
   );
 }
@@ -383,14 +355,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: appTheme.colors.background },
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  avatarContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: appTheme.colors.backgroundCard, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  userDetails: { flex: 1 },
-  userEmail: { fontSize: 16, fontWeight: '700', color: appTheme.colors.text },
-  subtitle: { fontSize: 12, color: appTheme.colors.textSecondary },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconButton: { padding: 8 },
+  refreshFab: { alignSelf: 'flex-end', marginRight: 20, marginTop: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: appTheme.colors.backgroundCard, alignItems: 'center', justifyContent: 'center' },
   balanceCard: { marginHorizontal: 20, borderRadius: 20, padding: 24, marginBottom: 24 },
   balanceLabel: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)', marginBottom: 8 },
   balanceAmount: { fontSize: 36, fontWeight: '900', color: '#FFF', marginBottom: 12 },

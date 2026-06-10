@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await api.post('/api/v1/auth/register', { name, email, password });
+      const response = await api.post('/api/v1/auth/register', { name, email, password, rol: 'user' });
       console.log('Register response:', JSON.stringify(response, null, 2));
 
       const token = response.token;

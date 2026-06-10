@@ -1,6 +1,7 @@
 import { AboutModal } from '@/components/AboutModal';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { HelpSupportModal } from '@/components/HelpSupportModal';
+import { FadeInView } from '@/constants/animations';
 import { appTheme } from '@/constants/appTheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUser } from '@/hooks/useUser';
@@ -95,6 +96,7 @@ export default function SettingsScreen() {
 
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 {/* Profile Section */}
+                <FadeInView delay={100}>
                 <View style={styles.profileCard}>
                     {loading ? (
                         <ActivityIndicator size="large" color={appTheme.colors.primary} />
@@ -120,8 +122,10 @@ export default function SettingsScreen() {
                         </>
                     )}
                 </View>
+                </FadeInView>
 
                 {/* General Settings */}
+                <FadeInView delay={200}>
                 <Text style={styles.sectionHeader}>{t('settings.general')}</Text>
                 <View style={styles.section}>
                     <SettingItem
@@ -151,14 +155,22 @@ export default function SettingsScreen() {
                         }
                     />
                     <SettingItem
+                        icon="briefcase"
+                        title="Bancos y Cuentas"
+                        subtitle="Configurar bancos y cuentas bancarias"
+                        onPress={() => router.push('/(tabs)/sumbank')}
+                    />
+                    <SettingItem
                         icon="globe"
                         title={t('settings.language')}
                         subtitle={t(`settings.language_${i18n.language}`)}
                         onPress={toggleLanguage}
                     />
                 </View>
+                </FadeInView>
 
                 {/* Support */}
+                <FadeInView delay={300}>
                 <Text style={styles.sectionHeader}>{t('settings.support')}</Text>
                 <View style={styles.section}>
                     <SettingItem
@@ -173,12 +185,7 @@ export default function SettingsScreen() {
                         onPress={() => setAboutModalVisible(true)}
                     />
                 </View>
-
-                {/* Logout */}
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                    <Feather name="log-out" size={20} color={appTheme.colors.error} />
-                    <Text style={styles.logoutText}>{t('settings.logout')}</Text>
-                </TouchableOpacity>
+                </FadeInView>
 
                 <View style={{ height: 40 }} />
             </ScrollView>
@@ -316,20 +323,5 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: appTheme.colors.textSecondary,
         marginTop: 2,
-    },
-    logoutButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        padding: 16,
-        borderRadius: 16,
-        gap: 8,
-        marginTop: 8,
-    },
-    logoutText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: appTheme.colors.error,
     },
 });

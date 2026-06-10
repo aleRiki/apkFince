@@ -1,4 +1,4 @@
-import LogoutButton from '@/components/LogoutButton';
+import { FadeInView, ScaleInView } from '@/constants/animations';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { api } from '@/services/api';
 import { Feather } from '@expo/vector-icons';
@@ -14,6 +14,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ExchangeRateCard from '@/components/ExchangeRateCard';
+import { useTasasCambio } from '@/hooks/useTasasCambio';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +32,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   health_care: '#14B8A6',
   debt_payment: '#64748B',
   other_expense: '#94A3B8',
+};
+
+const CURRENCY_FLAGS: Record<string, string> = {
+  USD: '🇺🇸', EUR: '🇪🇺', CUP: '🇨🇺', MXN: '🇲🇽',
+  BRL: '🇧🇷', COP: '🇨🇴', ARS: '🇦🇷', CLP: '🇨🇱',
+  GBP: '🇬🇧', JPY: '🇯🇵', CAD: '🇨🇦', CHF: '🇨🇭',
+};
+
+const CURRENCY_NAMES: Record<string, string> = {
+  USD: 'US Dollar', EUR: 'Euro', CUP: 'Peso Cubano', MXN: 'Peso Mexicano',
+  BRL: 'Real Brasileño', COP: 'Peso Colombiano', ARS: 'Peso Argentino', CLP: 'Peso Chileno',
+  GBP: 'Libra Esterlina', JPY: 'Yen Japonés', CAD: 'Dólar Canadiense', CHF: 'Franco Suizo',
 };
 
 interface Transaction {
@@ -90,6 +104,14 @@ export default function AnalyticsScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  const {
+    rates: exchangeRates,
+    loading: loadingExchange,
+    refetch: refetchExchange,
+    autoRefresh: autoRefreshExchange,
+    setAutoRefresh: setAutoRefreshExchange,
+  } = useTasasCambio();
 
   // Financial Summary
   const [totalIncome, setTotalIncome] = useState(0);
@@ -184,7 +206,8 @@ export default function AnalyticsScreen() {
       const [transactionsData, budgetsData, goalsData] = await Promise.all([
         api.get('/api/v1/transaction').catch(() => []),
         api.get('/api/v1/presupuesto').catch(() => []),
-        api.get('/api/v1/metas').catch(() => [])
+        api.get('/api/v1/metas').catch(() => []),
+        refetchExchange().catch(() => [])
       ]);
 
       console.log('📊 Analytics Debug:');
@@ -448,7 +471,6 @@ export default function AnalyticsScreen() {
 
       <View style={styles.header}>
         <Text style={styles.title}>Informes y Análisis</Text>
-        <LogoutButton />
       </View>
 
       {/* Period Tabs */}
@@ -491,6 +513,7 @@ export default function AnalyticsScreen() {
       ) : (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
           {/* Period Summary */}
+          <FadeInView delay={100}>
           <View style={styles.summaryCard}>
             <Text style={styles.cardTitle}>Resumen del Período</Text>
 
@@ -543,54 +566,61 @@ export default function AnalyticsScreen() {
               </View>
             </View>
           </View>
+          </FadeInView>
 
           {/* Balance Chart - By Category */}
+          <FadeInView delay={200}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Transacciones por Categoría</Text>
 
             {transactions.length > 0 ? (
               <>
-                <View style={styles.donutChartWrapper}>
-                  {/* Background Ring */}
-                  <View style={styles.donutBackgroundRing} />
-
-                  {/* Cumulative Segments (Simulated with progress bars/arcs) */}
-                  <View style={styles.chartVisualContainer}>
-                    <View style={[styles.mainProgressCircle, {
-                      borderColor: balance >= 0 ? appTheme.colors.success : appTheme.colors.error,
-                      borderRightColor: 'transparent',
-                      borderBottomColor: 'transparent',
-                      transform: [{ rotate: '45deg' }]
-                    }]} />
-                  </View>
-
-                  <View style={styles.donutCenter}>
-                    <Text style={styles.donutCenterLabel}>Balance Neto</Text>
-                    <Text style={[
-                      styles.donutCenterValue,
-                      { color: balance >= 0 ? appTheme.colors.success : appTheme.colors.error }
-                    ]}>
-                      {formatCurrency(balance)}
-                    </Text>
-
-                    {balanceTrend !== 0 && (
-                      <View style={[styles.centerTrendBadge, balanceTrend > 0 ? styles.trendUp : styles.trendDown]}>
-                        <Feather
-                          name={balanceTrend > 0 ? "arrow-up-right" : "arrow-down-right"}
-                          size={14}
-                          color={balanceTrend > 0 ? appTheme.colors.success : appTheme.colors.error}
-                        />
-                        <Text style={[styles.centerTrendText, { color: balanceTrend > 0 ? appTheme.colors.success : appTheme.colors.error }]}>
-                          {Math.abs(balanceTrend).toFixed(1)}%
-                        </Text>
+                {(() => {
+                  const totalIncomeAmt = transactions
+                    .filter((tx: any) => tx.transactionType === 'deposit')
+                    .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+                  const totalExpenseAmt = transactions
+                    .filter((tx: any) => tx.transactionType === 'withdraw')
+                    .reduce((sum: number, tx: any) => sum + parseFloat(tx.amount), 0);
+                  const totalAmt = totalIncomeAmt + totalExpenseAmt;
+                  const incomePct = totalAmt > 0 ? ((totalIncomeAmt / totalAmt) * 100).toFixed(1) : '0';
+                  const expensePct = totalAmt > 0 ? ((totalExpenseAmt / totalAmt) * 100).toFixed(1) : '0';
+                  return (
+                    <View style={styles.categorySummaryRow}>
+                      <View style={[styles.categorySummaryItem, { borderRightColor: 'rgba(148,163,184,0.2)', borderRightWidth: 1 }]}>
+                        <Text style={styles.categorySummaryLabel}>Total</Text>
+                        <Text style={styles.categorySummaryValue}>{formatCurrency(totalAmt)}</Text>
                       </View>
-                    )}
+                      <View style={styles.categorySummaryItem}>
+                        <Text style={[styles.categorySummaryLabel, { color: appTheme.colors.error }]}>Gastos</Text>
+                        <Text style={[styles.categorySummaryValue, { color: appTheme.colors.error }]}>{formatCurrency(totalExpenseAmt)}</Text>
+                        <View style={[styles.categorySummaryBadge, { backgroundColor: `${appTheme.colors.error}20` }]}>
+                          <Text style={[styles.categorySummaryBadgeText, { color: appTheme.colors.error }]}>{expensePct}%</Text>
+                        </View>
+                      </View>
+                      <View style={styles.categorySummaryItem}>
+                        <Text style={[styles.categorySummaryLabel, { color: appTheme.colors.success }]}>Ingresos</Text>
+                        <Text style={[styles.categorySummaryValue, { color: appTheme.colors.success }]}>{formatCurrency(totalIncomeAmt)}</Text>
+                        <View style={[styles.categorySummaryBadge, { backgroundColor: `${appTheme.colors.success}20` }]}>
+                          <Text style={[styles.categorySummaryBadgeText, { color: appTheme.colors.success }]}>{incomePct}%</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                <View style={styles.categoryProgressOverview}>
+                  <View style={styles.categoryOverviewBar}>
+                    <View style={[styles.categoryOverviewFill, { width: `${totalExpenses > 0 ? (totalExpenses / (totalExpenses + totalIncome)) * 100 : 0}%`, backgroundColor: appTheme.colors.error }]} />
+                  </View>
+                  <View style={styles.categoryOverviewLabels}>
+                    <Text style={[styles.categoryOverviewLabel, { color: appTheme.colors.error }]}>Gastos {totalExpenses > 0 ? ((totalExpenses / (totalExpenses + totalIncome)) * 100).toFixed(0) : 0}%</Text>
+                    <Text style={[styles.categoryOverviewLabel, { color: appTheme.colors.success }]}>Ingresos {totalIncome > 0 ? ((totalIncome / (totalExpenses + totalIncome)) * 100).toFixed(0) : 0}%</Text>
                   </View>
                 </View>
 
                 <View style={styles.legend}>
                   {(() => {
-                    const categoryMap = new Map<string, { amount: number, type: string }>();
                     const categoryNames: Record<string, string> = {
                       salary: 'Salario',
                       investment: 'Inversiones',
@@ -605,41 +635,48 @@ export default function AnalyticsScreen() {
                       shopping: 'Compras',
                       health_care: 'Salud',
                       debt_payment: 'Deudas',
-                      other_expense: 'Otros Gastos'
+                      other_expense: 'Otros Gastos',
+                      other_income: 'Otros Ingresos',
                     };
 
                     const categoryColors: Record<string, string> = {
                       salary: '#10B981',
                       investment: '#059669',
                       bonus: '#34D399',
+                      other_income: '#6EE7B7',
                       ...CATEGORY_COLORS
                     };
 
+                    const expenseMap = new Map<string, { amount: number }>();
+                    const incomeMap = new Map<string, { amount: number }>();
+
                     transactions.forEach((tx: any) => {
                       const category = tx.category || 'other_expense';
-                      const current = categoryMap.get(category) || { amount: 0, type: tx.transactionType };
-                      current.amount += parseFloat(tx.amount);
-                      categoryMap.set(category, current);
+                      const amount = parseFloat(tx.amount);
+                      if (tx.transactionType === 'deposit') {
+                        const current = incomeMap.get(category) || { amount: 0 };
+                        current.amount += amount;
+                        incomeMap.set(category, current);
+                      } else {
+                        const current = expenseMap.get(category) || { amount: 0 };
+                        current.amount += amount;
+                        expenseMap.set(category, current);
+                      }
                     });
 
-                    const total = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.amount, 0);
-                    return Array.from(categoryMap.entries())
-                      .map(([category, data]) => ({
-                        category,
-                        name: categoryNames[category] || category,
-                        amount: data.amount,
-                        percentage: ((data.amount / total) * 100).toFixed(1),
-                        color: data.type === 'deposit' ? appTheme.colors.success : appTheme.colors.error,
-                        type: data.type
-                      }))
-                      .sort((a, b) => b.amount - a.amount)
-                      .map((cat, index) => (
-                        <View key={index} style={styles.financialIndicator}>
+                    const expenseTotal = Array.from(expenseMap.values()).reduce((sum, cat) => sum + cat.amount, 0);
+                    const incomeTotal = Array.from(incomeMap.values()).reduce((sum, cat) => sum + cat.amount, 0);
+                    const grandTotal = expenseTotal + incomeTotal;
+
+                    const renderCategory = (cat: { category: string; amount: number; type: string; color: string }) => {
+                      const pct = grandTotal > 0 ? ((cat.amount / grandTotal) * 100).toFixed(1) : '0';
+                      return (
+                        <View key={`${cat.type}-${cat.category}`} style={styles.financialIndicator}>
                           <View style={styles.indicatorHeader}>
                             <View style={styles.indicatorLeft}>
                               <View style={[styles.indicatorDot, { backgroundColor: cat.color }]} />
                               <View>
-                                <Text style={styles.indicatorName}>{cat.name}</Text>
+                                <Text style={styles.indicatorName}>{categoryNames[cat.category] || cat.category}</Text>
                                 <Text style={styles.indicatorType}>
                                   {cat.type === 'deposit' ? 'Ingreso' : 'Gasto'}
                                 </Text>
@@ -652,20 +689,37 @@ export default function AnalyticsScreen() {
                               ]}>
                                 {cat.type === 'deposit' ? '+' : '-'}{formatCurrency(cat.amount)}
                               </Text>
-                              <Text style={styles.indicatorPercentage}>{cat.percentage}%</Text>
+                              <Text style={styles.indicatorPercentage}>{pct}%</Text>
                             </View>
                           </View>
                           <View style={styles.indicatorProgressBar}>
                             <View style={[
                               styles.indicatorProgress,
                               {
-                                width: `${cat.percentage}%` as any,
+                                width: `${pct}%` as any,
                                 backgroundColor: cat.color
                               }
                             ]} />
                           </View>
                         </View>
-                      ));
+                      );
+                    };
+
+                    const expenseItems = Array.from(expenseMap.entries())
+                      .map(([category, data]) => ({
+                        category, amount: data.amount, type: 'withdraw',
+                        color: categoryColors[category] || appTheme.colors.error
+                      }))
+                      .sort((a, b) => b.amount - a.amount);
+
+                    const incomeItems = Array.from(incomeMap.entries())
+                      .map(([category, data]) => ({
+                        category, amount: data.amount, type: 'deposit',
+                        color: categoryColors[category] || appTheme.colors.success
+                      }))
+                      .sort((a, b) => b.amount - a.amount);
+
+                    return [...expenseItems, ...incomeItems].map(renderCategory);
                   })()}
                 </View>
               </>
@@ -673,8 +727,10 @@ export default function AnalyticsScreen() {
               <Text style={styles.emptyText}>No hay transacciones en este período</Text>
             )}
           </View>
+          </FadeInView>
 
           {/* Goals Compliance */}
+          <FadeInView delay={300}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Cumplimiento de Metas</Text>
             {goals.length > 0 ? (
@@ -779,8 +835,10 @@ export default function AnalyticsScreen() {
               <Text style={styles.emptyText}>No hay metas configuradas</Text>
             )}
           </View>
+          </FadeInView>
 
           {/* Budget Analysis - Comparative Bar Chart */}
+          <FadeInView delay={400}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Análisis de Presupuesto</Text>
             {budgets.filter(b => (b.spent || 0) > 0).length > 0 ? (
@@ -873,8 +931,10 @@ export default function AnalyticsScreen() {
               <Text style={styles.emptyText}>No hay gastos registrados para analizar</Text>
             )}
           </View>
+          </FadeInView>
 
           {/* Candlestick Chart (Monthly Evolution) */}
+          <FadeInView delay={500}>
           <View style={styles.card}>
             <View style={styles.chartTitleContainer}>
               <Text style={styles.cardTitle}>Evolución Mensual</Text>
@@ -960,8 +1020,52 @@ export default function AnalyticsScreen() {
               </View>
             </View>
           </View>
+          </FadeInView>
 
-          <View style={{ height: 40 }} />
+          {/* Exchange Rates Section */}
+          <FadeInView delay={600}>
+            <View style={styles.card}>
+              <View style={styles.exchangeHeaderRow}>
+                <Text style={styles.cardTitle}>Tasas de Cambio</Text>
+                <TouchableOpacity
+                  onPress={() => setAutoRefreshExchange(!autoRefreshExchange)}
+                  style={[styles.autoExchangeBtn, autoRefreshExchange && styles.autoExchangeBtnActive]}
+                >
+                  <Feather name="radio" size={14} color={autoRefreshExchange ? appTheme.colors.primary : appTheme.colors.textSecondary} />
+                  <Text style={[styles.autoExchangeBtnText, autoRefreshExchange && styles.autoExchangeBtnTextActive]}>
+                    Auto
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {loadingExchange && exchangeRates.length === 0 ? (
+                <View style={styles.exchangeLoadingContainer}>
+                  <ActivityIndicator size="small" color={appTheme.colors.primary} />
+                  <Text style={styles.exchangeLoadingText}>Cargando tasas...</Text>
+                </View>
+              ) : (
+                <View style={styles.exchangeList}>
+                  {exchangeRates.map((rate, idx) => {
+                    const flag = CURRENCY_FLAGS[rate.currency] || '💱';
+                    const name = CURRENCY_NAMES[rate.currency] || rate.currency;
+                    return (
+                      <ExchangeRateCard
+                        key={rate.currency}
+                        currency={rate.currency}
+                        name={name}
+                        symbol={rate.symbol}
+                        flag={flag}
+                        rate={rate.rate}
+                        index={idx}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </FadeInView>
+
+          <View style={{ height: 140 }} />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -1728,5 +1832,100 @@ const styles = StyleSheet.create({
   goalsTotalProgressFill: {
     height: '100%',
     backgroundColor: appTheme.colors.primary,
+  },
+  exchangeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  autoExchangeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+    gap: 6,
+  },
+  autoExchangeBtnActive: {
+    borderColor: appTheme.colors.primary,
+    borderWidth: 1,
+    backgroundColor: 'rgba(14, 165, 164, 0.1)',
+  },
+  autoExchangeBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: appTheme.colors.textSecondary,
+  },
+  autoExchangeBtnTextActive: {
+    color: appTheme.colors.primary,
+  },
+  exchangeLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  exchangeLoadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: appTheme.colors.textSecondary,
+  },
+  exchangeList: {
+    gap: 10,
+  },
+  categorySummaryRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: appTheme.colors.backgroundCard,
+    borderRadius: 12,
+    padding: 16,
+  },
+  categorySummaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  categorySummaryLabel: {
+    fontSize: 11,
+    color: appTheme.colors.textSecondary,
+    fontWeight: '600',
+  },
+  categorySummaryValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: appTheme.colors.text,
+  },
+  categorySummaryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  categorySummaryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  categoryProgressOverview: {
+    marginBottom: 16,
+    gap: 6,
+  },
+  categoryOverviewBar: {
+    height: 8,
+    backgroundColor: 'rgba(148, 163, 184, 0.15)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  categoryOverviewFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  categoryOverviewLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  categoryOverviewLabel: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

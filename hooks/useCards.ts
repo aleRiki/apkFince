@@ -2,11 +2,13 @@ import { api } from '@/services/api';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface Card {
-  id: string;
+  id: number;
   number: string;
+  balance?: string;
   account: {
     id: number;
     name: string;
+    type?: string;
   };
 }
 

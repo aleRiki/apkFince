@@ -5,11 +5,18 @@ import { Alert } from 'react-native';
 export interface Task {
   id: string;
   title: string;
-  description: string; // Changed from category to match backend DTO
-  isCompleted: boolean; // Changed from completed to match backend DTO
+  description: string;
+  type: string;
+  isCompleted: boolean;
+  spentAmount: number;
+  presupuesto: {
+    id: number;
+    name: string;
+    presupuesto: number;
+    card?: { id: number; number: string; balance: string };
+  };
   createdAt?: string;
-  userId?: string;
-  collaboratorCount?: number; // Number of collaborators (from users array length)
+  users: any[];
 }
 
 export const useTasks = () => {
@@ -21,7 +28,6 @@ export const useTasks = () => {
     setLoading(true);
     setError(null);
     try {
-      // Using the specific endpoint mentioned by the user: /api/v1/taskt
       const data = await api.get('/api/v1/taskt');
       setTasks(data);
     } catch (err) {
@@ -32,13 +38,13 @@ export const useTasks = () => {
     }
   }, []);
 
-  const createTask = async (title: string, category: string, userIds: number[] = []) => {
+  const createTask = async (title: string, type: string, presupuestoId: number, userIds: number[] = []) => {
     try {
-      // Backend expects 'description' and 'isCompleted'
-      // Mapping 'category' from UI to 'description' for backend
       const newTask = await api.post('/api/v1/taskt', {
         title,
-        description: category, 
+        description: type,
+        type,
+        presupuestoId,
         isCompleted: false,
         userIds
       });
@@ -51,23 +57,14 @@ export const useTasks = () => {
     }
   };
 
-  const toggleTaskCompletion = async (taskId: string, currentStatus: boolean) => {
+  const toggleTaskCompletion = async (taskId: string, _currentStatus: boolean, amount?: number) => {
     try {
-      // Optimistic update
-      setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, isCompleted: !currentStatus } : t
-      ));
-
-      await api.patch(`/api/v1/taskt/${taskId}`, {
-        isCompleted: !currentStatus
-      });
+      await api.patch(`/api/v1/taskt/${taskId}/completed`, { amount });
+      const updated = await api.get(`/api/v1/taskt/${taskId}`);
+      setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
     } catch (err) {
-      console.error('Error updating task:', err);
-      // Revert optimistic update
-      setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, isCompleted: currentStatus } : t
-      ));
-      Alert.alert('Error', 'No se pudo actualizar la tarea');
+      console.error('Error completing task:', err);
+      Alert.alert('Error', 'No se pudo completar la tarea. Verifica fondos suficientes.');
     }
   };
 

@@ -34,7 +34,7 @@ export default function AddBudgetModal({ visible, onClose, onSubmit }: AddBudget
     const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
 
-    const { cards, loading: cardsLoading, refetch: fetchCards } = useCards();
+    const { cards, loading: cardsLoading, error: cardsError, refetch: fetchCards } = useCards();
 
     // User search state
     const [users, setUsers] = useState<User[]>([]);
@@ -45,7 +45,7 @@ export default function AddBudgetModal({ visible, onClose, onSubmit }: AddBudget
     const fetchUsers = async () => {
         setLoadingUsers(true);
         try {
-            const { data } = await api.get('/api/v1/users');
+            const data = await api.get('/api/v1/users');
             setUsers(data);
         } catch (error) {
             console.error('Error fetching users:', error);
@@ -189,6 +189,20 @@ export default function AddBudgetModal({ visible, onClose, onSubmit }: AddBudget
                                 <Text style={styles.label}>Tarjeta</Text>
                                 {cardsLoading ? (
                                     <ActivityIndicator color={appTheme.colors.primary} />
+                                ) : cardsError ? (
+                                    <View style={styles.emptyContainer}>
+                                        <Feather name="alert-circle" size={32} color={appTheme.colors.error} />
+                                        <Text style={styles.emptyText}>Error al cargar tarjetas</Text>
+                                        <TouchableOpacity onPress={fetchCards} style={styles.retryButton}>
+                                            <Text style={styles.retryText}>Reintentar</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : cards.length === 0 ? (
+                                    <View style={styles.emptyContainer}>
+                                        <Feather name="credit-card" size={32} color={appTheme.colors.textSecondary} />
+                                        <Text style={styles.emptyText}>No tienes tarjetas disponibles</Text>
+                                        <Text style={styles.emptyHint}>Crea una tarjeta primero en la sección de cuentas</Text>
+                                    </View>
                                 ) : (
                                     <View style={styles.optionsList}>
                                         {cards.map((card) => (
@@ -196,22 +210,22 @@ export default function AddBudgetModal({ visible, onClose, onSubmit }: AddBudget
                                                 key={card.id}
                                                 style={[
                                                     styles.optionItem,
-                                                    selectedCardId === parseInt(card.id) && styles.selectedOption,
+                                                    selectedCardId === card.id && styles.selectedOption,
                                                 ]}
-                                                onPress={() => setSelectedCardId(parseInt(card.id))}
+                                                onPress={() => setSelectedCardId(card.id)}
                                             >
                                                 <Feather
                                                     name="credit-card"
                                                     size={20}
-                                                    color={selectedCardId === parseInt(card.id) ? '#FFF' : appTheme.colors.textSecondary}
+                                                    color={selectedCardId === card.id ? '#FFF' : appTheme.colors.textSecondary}
                                                 />
                                                 <Text
                                                     style={[
                                                         styles.optionText,
-                                                        selectedCardId === parseInt(card.id) && styles.selectedOptionText,
+                                                        selectedCardId === card.id && styles.selectedOptionText,
                                                     ]}
                                                 >
-                                                    {card.number} - {card.account.name}
+                                                    {card.number} - {card.account?.name || 'Sin cuenta'}
                                                 </Text>
                                             </TouchableOpacity>
                                         ))}
@@ -471,5 +485,34 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: appTheme.colors.textSecondary,
         fontStyle: 'italic',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        padding: 24,
+        gap: 8,
+    },
+    emptyText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: appTheme.colors.textSecondary,
+        textAlign: 'center',
+    },
+    emptyHint: {
+        fontSize: 12,
+        color: appTheme.colors.textSecondary,
+        textAlign: 'center',
+        fontStyle: 'italic',
+    },
+    retryButton: {
+        marginTop: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: appTheme.colors.primary,
+    },
+    retryText: {
+        color: '#FFF',
+        fontWeight: '600',
+        fontSize: 13,
     },
 });

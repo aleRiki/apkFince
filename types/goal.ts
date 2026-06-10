@@ -1,25 +1,42 @@
-import { Budget } from './budget';
-
 export interface Goal {
   id: number;
   name: string;
   description: string;
-  presupuesto: Budget; // Nested budget object from API
+  type: 'gasto' | 'ahorro';
+  amount: number;
+  progreso: number;
+  completed: boolean;
+  presupuesto?: {
+    id: number;
+    name: string;
+    presupuesto: number;
+    card?: { id: number; number: string; balance: string };
+  };
+  card?: { id: number; number: string; balance: string };
+  account?: { id: number; name: string; balance: string };
   users: any[];
-  progreso?: number; // 0-100 completion percentage
-  createdAt?: string;
 }
 
 export interface GoalCreateData {
   name: string;
   description: string;
-  presupuestoId: number;
+  type: 'gasto' | 'ahorro';
+  amount: number;
+  presupuestoId?: number;
+  cardId?: number;
+  accountId?: number;
   userIds: number[];
 }
 
 export interface GoalUpdateData {
   name?: string;
   description?: string;
+  type?: 'gasto' | 'ahorro';
+  amount?: number;
+  presupuestoId?: number;
+  cardId?: number;
+  accountId?: number;
   userIds?: number[];
-  progreso?: number; // 0-100
+  progreso?: number;
+  completed?: boolean;
 }

@@ -23,7 +23,7 @@ export default function AddTransactionModal({ visible, onClose, onSubmit }: AddT
     const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+    const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [showCardPicker, setShowCardPicker] = useState(false);
     const { cards } = useCards();
@@ -44,8 +44,7 @@ export default function AddTransactionModal({ visible, onClose, onSubmit }: AddT
 
         try {
             setLoading(true);
-            const cardIdNum = parseInt(selectedCardId, 10);
-            await onSubmit(transactionType, amountNum, description, cardIdNum);
+            await onSubmit(transactionType, amountNum, description, selectedCardId);
             setAmount('');
             setDescription('');
             setSelectedCardId(null);

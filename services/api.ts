@@ -181,13 +181,45 @@ export const api = {
         headers,
         body: JSON.stringify(body),
       });
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorBody = await response.text();
+          if (errorBody) {
+            try {
+              const errorJson = JSON.parse(errorBody);
+              if (errorJson.message) {
+                errorMessage = typeof errorJson.message === 'string'
+                  ? errorJson.message
+                  : JSON.stringify(errorJson.message);
+              }
+            } catch {
+              if (errorBody.trim().length > 0) {
+                errorMessage = errorBody;
+              }
+            }
+          }
+        } catch (readError) {
+          console.warn('Could not read error response body:', readError);
+        }
+
+        const errorType = response.status >= 500 ? 'SERVER' : 'CLIENT';
+        throw new ApiError(errorMessage, errorType, response.status);
       }
+
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       console.error('API Request Error:', error);
-      throw error;
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      throw new ApiError(
+        error.message || 'Error desconocido',
+        'UNKNOWN'
+      );
     }
   },
   delete: async (endpoint: string) => {

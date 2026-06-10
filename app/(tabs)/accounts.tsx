@@ -1,7 +1,6 @@
 import AddAccountModal from '@/components/AddAccountModal';
 import AddCardModal from '@/components/AddCardModal';
 import DepositModal from '@/components/DepositModal';
-import LogoutButton from '@/components/LogoutButton';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCards } from '@/hooks/useCards';
@@ -198,7 +197,6 @@ export default function AccountsScreen() {
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
       <View style={styles.header}>
         <Text style={styles.title}>Estado Bancario</Text>
-        <LogoutButton />
       </View>
 
       <View style={styles.balanceSection}>

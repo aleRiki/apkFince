@@ -3,9 +3,9 @@ import { AddTaskModal } from '@/components/AddTaskModal';
 import EditBudgetProgressModal from '@/components/EditBudgetProgressModal';
 import EditGoalProgressModal from '@/components/EditGoalProgressModal';
 import GoalModal from '@/components/GoalModal';
-import LogoutButton from '@/components/LogoutButton';
 import { TaskDetailModal } from '@/components/TaskDetailModal';
 import { TaskItem } from '@/components/TaskItem';
+import { FadeInView } from '@/constants/animations';
 import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useGoals } from '@/hooks/useGoals';
@@ -85,6 +85,18 @@ export default function BudgetsScreen() {
       setGoalModalVisible(false);
       alert('Meta creada exitosamente');
     }
+  };
+
+  const handleCreateTask = async (taskData: any) => {
+    const success = await createTask(taskData.title, taskData.type, taskData.presupuestoId, taskData.userIds || []);
+    if (success) {
+      setTaskModalVisible(false);
+      alert('Tarea creada exitosamente');
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string, _amount: number) => {
+    await fetchTasks();
   };
 
   const getTransactionCategory = (budgetName: string): string => {
@@ -171,20 +183,6 @@ export default function BudgetsScreen() {
 
       <View style={styles.header}>
         <Text style={styles.title}>Presupuestos</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={handleRefresh}
-            style={styles.refreshButton}
-            disabled={budgetsLoading || goalsLoading || tasksLoading}
-          >
-            <Feather
-              name="refresh-cw"
-              size={22}
-              color={(budgetsLoading || goalsLoading || tasksLoading) ? appTheme.colors.textSecondary : appTheme.colors.primary}
-            />
-          </TouchableOpacity>
-          <LogoutButton />
-        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -218,7 +216,9 @@ export default function BudgetsScreen() {
         {activeTab === 'budgets' && (
           <>
             {/* Summary Card */}
-            {budgets.length > 0 && (() => {
+            {budgets.length > 0 && (
+            <FadeInView delay={100}>
+              {(() => {
               // Calculate totals
               const totalPresupuesto = budgets.reduce((sum, b) => sum + b.presupuesto, 0);
               const totalGastado = budgets.reduce((sum, b) => {
@@ -271,7 +271,10 @@ export default function BudgetsScreen() {
                 </LinearGradient>
               );
             })()}
+            </FadeInView>
+            )}
 
+            <FadeInView delay={200}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tus Presupuestos</Text>
               <Text style={styles.sectionSubtitle}>Gestiona tus presupuestos por tarjeta</Text>
@@ -362,10 +365,12 @@ export default function BudgetsScreen() {
                 })
               )}
             </View>
+            </FadeInView>
           </>
         )}
 
         {activeTab === 'goals' && (
+          <FadeInView delay={150}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tus Metas</Text>
             <Text style={styles.sectionSubtitle}>Define y alcanza tus objetivos financieros</Text>
@@ -436,9 +441,11 @@ export default function BudgetsScreen() {
               })
             )}
           </View>
+          </FadeInView>
         )}
 
         {activeTab === 'tasks' && (
+          <FadeInView delay={200}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tus Tareas</Text>
             <Text style={styles.sectionSubtitle}>
@@ -462,7 +469,10 @@ export default function BudgetsScreen() {
                 <TaskItem
                   key={task.id}
                   task={task}
-                  onToggleComplete={(id) => toggleTaskCompletion(id, task.isCompleted)}
+                  onToggleComplete={(id) => {
+                    setSelectedTaskId(id);
+                    setTaskDetailModalVisible(true);
+                  }}
                   onShare={(t) => console.log('Sharing', t)}
                   onPress={(id) => {
                     setSelectedTaskId(id);
@@ -472,6 +482,7 @@ export default function BudgetsScreen() {
               ))
             )}
           </View>
+          </FadeInView>
         )}
 
         <View style={{ height: 100 }} />
@@ -518,7 +529,7 @@ export default function BudgetsScreen() {
       <AddTaskModal
         visible={taskModalVisible}
         onClose={() => setTaskModalVisible(false)}
-        onSubmit={(task) => createTask(task.title, task.category, task.userIds)}
+        onSubmit={handleCreateTask}
       />
 
       <TaskDetailModal
@@ -529,8 +540,9 @@ export default function BudgetsScreen() {
           setSelectedTaskId(null);
         }}
         onDelete={() => {
-          fetchTasks(); // Refresh task list after deletion
+          fetchTasks();
         }}
+        onComplete={handleCompleteTask}
       />
       <EditGoalProgressModal
         visible={editGoalModalVisible}
@@ -554,14 +566,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  refreshButton: {
-    padding: 8,
   },
   title: {
     fontSize: 28,

@@ -1,4 +1,3 @@
-import LogoutButton from '@/components/LogoutButton';
 import { appTheme } from '@/constants/appTheme';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBanks } from '@/hooks/useBanks';
@@ -110,7 +109,6 @@ export default function BankManagementScreen() {
       <StatusBar barStyle="light-content" backgroundColor={appTheme.colors.background} />
       <View style={styles.header}>
         <Text style={styles.title}>Gestión Bancaria</Text>
-        <LogoutButton />
       </View>
 
       <ScrollView

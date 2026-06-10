@@ -1,4 +1,4 @@
-import { appTheme } from '@/constants/appTheme';
+import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { api } from '@/services/api';
 import { GoalCreateData } from '@/types/goal';
 import { Feather } from '@expo/vector-icons';
@@ -24,6 +24,20 @@ interface Budget {
     id: number;
     name: string;
     description: string;
+    presupuesto: number;
+    porcentajeCumplido?: number;
+}
+
+interface Card {
+    id: number;
+    number: string;
+    balance: string;
+}
+
+interface Account {
+    id: number;
+    name: string;
+    balance: string;
 }
 
 interface GoalModalProps {
@@ -35,16 +49,23 @@ interface GoalModalProps {
 export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps) {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [type, setType] = useState<'gasto' | 'ahorro'>('gasto');
+    const [amount, setAmount] = useState('');
     const [selectedIcon, setSelectedIcon] = useState('target');
     const [selectedPresupuestoId, setSelectedPresupuestoId] = useState<number | null>(null);
+    const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+    const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isBudgetDropdownOpen, setIsBudgetDropdownOpen] = useState(false);
+    const [isCardDropdownOpen, setIsCardDropdownOpen] = useState(false);
 
-    // Data for selectors
     const [budgets, setBudgets] = useState<Budget[]>([]);
+    const [cards, setCards] = useState<Card[]>([]);
+    const [accounts, setAccounts] = useState<Account[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [loadingBudgets, setLoadingBudgets] = useState(false);
+    const [loadingCards, setLoadingCards] = useState(false);
     const [loadingUsers, setLoadingUsers] = useState(false);
 
     const icons = ['target', 'umbrella', 'sun', 'home', 'gift', 'award'];
@@ -58,10 +79,16 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
         if (visible) {
             setName('');
             setDescription('');
+            setType('gasto');
+            setAmount('');
             setSelectedIcon('target');
             setSelectedPresupuestoId(null);
+            setSelectedCardId(null);
+            setSelectedAccountId(null);
             setSelectedUserIds([]);
             fetchBudgets();
+            fetchCards();
+            fetchAccounts();
             fetchUsers();
         }
     }, [visible]);
@@ -75,6 +102,27 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
             console.error('Error fetching budgets:', error);
         } finally {
             setLoadingBudgets(false);
+        }
+    };
+
+    const fetchCards = async () => {
+        setLoadingCards(true);
+        try {
+            const data = await api.get('/api/v1/card');
+            setCards(data);
+        } catch (error) {
+            console.error('Error fetching cards:', error);
+        } finally {
+            setLoadingCards(false);
+        }
+    };
+
+    const fetchAccounts = async () => {
+        try {
+            const data = await api.get('/api/v1/accounts');
+            setAccounts(data);
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
         }
     };
 
@@ -103,19 +151,31 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
             alert('Por favor ingresa un nombre para la meta');
             return;
         }
-        if (!description.trim()) {
-            alert('Por favor ingresa una descripción');
+        const amountNum = parseFloat(amount);
+        if (isNaN(amountNum) || amountNum <= 0) {
+            alert('Por favor ingresa un monto válido para la meta');
             return;
         }
-        if (selectedPresupuestoId === null) {
-            alert('Por favor selecciona un presupuesto');
-            return;
+        if (type === 'gasto') {
+            if (selectedPresupuestoId === null) {
+                alert('Por favor selecciona un presupuesto');
+                return;
+            }
+        } else {
+            if (selectedCardId === null && selectedAccountId === null) {
+                alert('Por favor selecciona una tarjeta o cuenta');
+                return;
+            }
         }
 
         onSubmit({
             name,
             description,
-            presupuestoId: selectedPresupuestoId,
+            type,
+            amount: amountNum,
+            presupuestoId: type === 'gasto' ? selectedPresupuestoId! : undefined,
+            cardId: type === 'ahorro' ? selectedCardId! : undefined,
+            accountId: type === 'ahorro' ? selectedAccountId! : undefined,
             userIds: selectedUserIds,
         });
         onClose();
@@ -143,7 +203,7 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
                                 <Text style={styles.label}>Nombre de la meta</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Ej. Meta Marketing"
+                                    placeholder="Ej. Ahorro para vacaciones"
                                     placeholderTextColor={appTheme.colors.textSecondary}
                                     value={name}
                                     onChangeText={setName}
@@ -160,6 +220,50 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
                                     onChangeText={setDescription}
                                     multiline
                                     numberOfLines={3}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Tipo de meta</Text>
+                                <View style={styles.typeSelector}>
+                                    <TouchableOpacity
+                                        style={[styles.typeOption, type === 'gasto' && styles.typeOptionActive]}
+                                        onPress={() => setType('gasto')}
+                                    >
+                                        <Feather
+                                            name="trending-down"
+                                            size={20}
+                                            color={type === 'gasto' ? '#FFF' : appTheme.colors.textSecondary}
+                                        />
+                                        <Text style={[styles.typeText, type === 'gasto' && styles.typeTextActive]}>
+                                            Gasto
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.typeOption, type === 'ahorro' && styles.typeOptionActive]}
+                                        onPress={() => setType('ahorro')}
+                                    >
+                                        <Feather
+                                            name="trending-up"
+                                            size={20}
+                                            color={type === 'ahorro' ? '#FFF' : appTheme.colors.textSecondary}
+                                        />
+                                        <Text style={[styles.typeText, type === 'ahorro' && styles.typeTextActive]}>
+                                            Ahorro
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Monto objetivo</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Ej. 500.00"
+                                    placeholderTextColor={appTheme.colors.textSecondary}
+                                    keyboardType="decimal-pad"
+                                    value={amount}
+                                    onChangeText={setAmount}
                                 />
                             </View>
 
@@ -185,71 +289,148 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
                                 </View>
                             </View>
 
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Presupuesto asociado</Text>
-                                {loadingBudgets ? (
-                                    <ActivityIndicator color={appTheme.colors.primary} />
-                                ) : (
-                                    <View>
-                                        <TouchableOpacity
-                                            style={styles.dropdownButton}
-                                            onPress={() => setIsBudgetDropdownOpen(!isBudgetDropdownOpen)}
-                                        >
-                                            <Feather name="briefcase" size={20} color={appTheme.colors.textSecondary} />
-                                            <Text style={styles.dropdownButtonText}>
-                                                {selectedPresupuestoId
-                                                    ? budgets.find(b => b.id === selectedPresupuestoId)?.name
-                                                    : 'Seleccionar un presupuesto'}
-                                            </Text>
-                                            <Feather
-                                                name={isBudgetDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                                                size={20}
-                                                color={appTheme.colors.textSecondary}
-                                            />
-                                        </TouchableOpacity>
+                            {type === 'gasto' ? (
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Presupuesto asociado</Text>
+                                    {loadingBudgets ? (
+                                        <ActivityIndicator color={appTheme.colors.primary} />
+                                    ) : (
+                                        <View>
+                                            <TouchableOpacity
+                                                style={styles.dropdownButton}
+                                                onPress={() => setIsBudgetDropdownOpen(!isBudgetDropdownOpen)}
+                                            >
+                                                <Feather name="briefcase" size={20} color={appTheme.colors.textSecondary} />
+                                                <Text style={styles.dropdownButtonText}>
+                                                    {selectedPresupuestoId
+                                                        ? budgets.find(b => b.id === selectedPresupuestoId)?.name
+                                                        : 'Seleccionar un presupuesto'}
+                                                </Text>
+                                                <Feather
+                                                    name={isBudgetDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                                                    size={20}
+                                                    color={appTheme.colors.textSecondary}
+                                                />
+                                            </TouchableOpacity>
 
-                                        {isBudgetDropdownOpen && (
-                                            <View style={styles.dropdownContent}>
-                                                {budgets.map((budget) => (
-                                                    <TouchableOpacity
-                                                        key={budget.id}
-                                                        style={[
-                                                            styles.dropdownItem,
-                                                            selectedPresupuestoId === budget.id && styles.selectedDropdownItem,
-                                                        ]}
-                                                        onPress={() => {
-                                                            setSelectedPresupuestoId(budget.id);
-                                                            setIsBudgetDropdownOpen(false);
-                                                        }}
-                                                    >
-                                                        <View style={{ flex: 1 }}>
-                                                            <Text
+                                            {isBudgetDropdownOpen && (
+                                                <View style={styles.dropdownContent}>
+                                                    {budgets.map((budget) => (
+                                                        <TouchableOpacity
+                                                            key={budget.id}
+                                                            style={[
+                                                                styles.dropdownItem,
+                                                                selectedPresupuestoId === budget.id && styles.selectedDropdownItem,
+                                                            ]}
+                                                            onPress={() => {
+                                                                setSelectedPresupuestoId(budget.id);
+                                                                setIsBudgetDropdownOpen(false);
+                                                            }}
+                                                        >
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={[styles.optionText, selectedPresupuestoId === budget.id && styles.selectedOptionText]}>
+                                                                    {budget.name}
+                                                                </Text>
+                                                                <Text style={[styles.optionSubtext, selectedPresupuestoId === budget.id && styles.selectedOptionSubtext]}>
+                                                                    {(() => {
+                                                                        const montoGastado = (budget.presupuesto * (budget.porcentajeCumplido || 0)) / 100;
+                                                                        return `Disponible: ${formatCurrency(Math.max(0, budget.presupuesto - montoGastado))} de ${formatCurrency(budget.presupuesto)}`;
+                                                                    })()}
+                                                                </Text>
+                                                            </View>
+                                                            {selectedPresupuestoId === budget.id && (
+                                                                <Feather name="check" size={18} color="#FFF" />
+                                                            )}
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+                            ) : (
+                                <>
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Tarjeta destino (opcional)</Text>
+                                        {loadingCards ? (
+                                            <ActivityIndicator color={appTheme.colors.primary} />
+                                        ) : (
+                                            <View>
+                                                <TouchableOpacity
+                                                    style={styles.dropdownButton}
+                                                    onPress={() => setIsCardDropdownOpen(!isCardDropdownOpen)}
+                                                >
+                                                    <Feather name="credit-card" size={20} color={appTheme.colors.textSecondary} />
+                                                    <Text style={styles.dropdownButtonText}>
+                                                        {selectedCardId
+                                                            ? `**** ${cards.find(c => c.id === selectedCardId)?.number?.slice(-4) || ''}`
+                                                            : 'Seleccionar tarjeta'}
+                                                    </Text>
+                                                    <Feather
+                                                        name={isCardDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                                                        size={20}
+                                                        color={appTheme.colors.textSecondary}
+                                                    />
+                                                </TouchableOpacity>
+
+                                                {isCardDropdownOpen && (
+                                                    <View style={styles.dropdownContent}>
+                                                        {cards.map((card) => (
+                                                            <TouchableOpacity
+                                                                key={card.id}
                                                                 style={[
-                                                                    styles.optionText,
-                                                                    selectedPresupuestoId === budget.id && styles.selectedOptionText,
+                                                                    styles.dropdownItem,
+                                                                    selectedCardId === card.id && styles.selectedDropdownItem,
                                                                 ]}
+                                                                onPress={() => {
+                                                                    setSelectedCardId(card.id);
+                                                                    setIsCardDropdownOpen(false);
+                                                                }}
                                                             >
-                                                                {budget.name}
-                                                            </Text>
-                                                            <Text
-                                                                style={[
-                                                                    styles.optionSubtext,
-                                                                    selectedPresupuestoId === budget.id && styles.selectedOptionSubtext,
-                                                                ]}
-                                                            >
-                                                                {budget.description}
-                                                            </Text>
-                                                        </View>
-                                                        {selectedPresupuestoId === budget.id && (
-                                                            <Feather name="check" size={18} color="#FFF" />
-                                                        )}
-                                                    </TouchableOpacity>
-                                                ))}
+                                                                <View style={{ flex: 1 }}>
+                                                                    <Text style={[styles.optionText, selectedCardId === card.id && styles.selectedOptionText]}>
+                                                                        **** {card.number?.slice(-4) || 'N/A'}
+                                                                    </Text>
+                                                                    <Text style={[styles.optionSubtext, selectedCardId === card.id && styles.selectedOptionSubtext]}>
+                                                                        Balance: ${parseFloat(card.balance).toFixed(2)}
+                                                                    </Text>
+                                                                </View>
+                                                                {selectedCardId === card.id && (
+                                                                    <Feather name="check" size={18} color="#FFF" />
+                                                                )}
+                                                            </TouchableOpacity>
+                                                        ))}
+                                                    </View>
+                                                )}
                                             </View>
                                         )}
                                     </View>
-                                )}
-                            </View>
+
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>O cuenta destino (opcional)</Text>
+                                        <TouchableOpacity
+                                            style={[styles.dropdownButton, { borderColor: selectedAccountId ? appTheme.colors.primary : 'rgba(148, 163, 184, 0.2)' }]}
+                                            onPress={() => {
+                                                const accts = accounts;
+                                                if (accts.length === 0) {
+                                                    alert('No hay cuentas disponibles');
+                                                    return;
+                                                }
+                                                const currentIdx = selectedAccountId ? accts.findIndex(a => a.id === selectedAccountId) : -1;
+                                                const nextIdx = (currentIdx + 1) % accts.length;
+                                                setSelectedAccountId(accts[nextIdx].id);
+                                            }}
+                                        >
+                                            <Feather name="shield" size={20} color={appTheme.colors.textSecondary} />
+                                            <Text style={styles.dropdownButtonText}>
+                                                {selectedAccountId
+                                                    ? accounts.find(a => a.id === selectedAccountId)?.name
+                                                    : 'Toca para seleccionar cuenta'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
 
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Usuarios (Opcional)</Text>
@@ -268,7 +449,6 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
                                     <ActivityIndicator color={appTheme.colors.primary} />
                                 ) : (
                                     <View style={styles.optionsList}>
-                                        {/* Usuarios Seleccionados (siempre visibles) */}
                                         {selectedUserIds.length > 0 && users
                                             .filter(u => selectedUserIds.includes(u.id))
                                             .map((user) => (
@@ -293,7 +473,6 @@ export default function GoalModal({ visible, onClose, onSubmit }: GoalModalProps
                                             ))
                                         }
 
-                                        {/* Resultados de Búsqueda (solo si hay query) */}
                                         {searchQuery.length > 0 && filteredUsers
                                             .filter(u => !selectedUserIds.includes(u.id))
                                             .map((user) => (
@@ -391,6 +570,34 @@ const styles = StyleSheet.create({
     textArea: {
         minHeight: 80,
         textAlignVertical: 'top',
+    },
+    typeSelector: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    typeOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: appTheme.colors.backgroundCard,
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.2)',
+    },
+    typeOptionActive: {
+        backgroundColor: appTheme.colors.primary,
+        borderColor: appTheme.colors.primary,
+    },
+    typeText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: appTheme.colors.textSecondary,
+    },
+    typeTextActive: {
+        color: '#FFF',
     },
     iconSelector: {
         flexDirection: 'row',
@@ -549,9 +756,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: appTheme.colors.primary,
-    },
-    selectedAvatarText: {
-        color: '#FFF',
     },
     userInfo: {
         flex: 1,

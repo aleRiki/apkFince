@@ -36,7 +36,11 @@ export default function EditGoalProgressModal({ visible, onClose, onSubmit, goal
         }
 
         if (goal?.id) {
-            onSubmit(goal.id, { progreso });
+            const data: GoalUpdateData = { progreso };
+            if (progreso >= 100) {
+                data.completed = true;
+            }
+            onSubmit(goal.id, data);
             onClose();
         }
     };
@@ -65,14 +69,40 @@ export default function EditGoalProgressModal({ visible, onClose, onSubmit, goal
                         <View style={styles.goalInfo}>
                             <Text style={styles.goalName}>{goal.name}</Text>
                             <Text style={styles.goalDescription}>{goal.description}</Text>
-                            {goal.presupuesto && (
-                                <View style={styles.budgetBadge}>
-                                    <Feather name="dollar-sign" size={12} color={appTheme.colors.primary} />
-                                    <Text style={styles.budgetName}>
-                                        {goal.presupuesto.name}: {formatCurrency(goal.presupuesto.presupuesto)}
-                                    </Text>
-                                </View>
-                            )}
+                            {goal.type && (
+                      <View style={styles.typeBadge}>
+                        <Feather
+                          name={goal.type === 'ahorro' ? 'trending-up' : 'trending-down'}
+                          size={14}
+                          color={goal.type === 'ahorro' ? appTheme.colors.success : appTheme.colors.error}
+                        />
+                        <Text style={[styles.typeText, { color: goal.type === 'ahorro' ? appTheme.colors.success : appTheme.colors.error }]}>
+                          {goal.type === 'ahorro' ? 'Ahorro' : 'Gasto'}
+                        </Text>
+                      </View>
+                    )}
+                    {goal.amount > 0 && (
+                      <View style={styles.amountBadge}>
+                        <Feather name="dollar-sign" size={14} color={appTheme.colors.primary} />
+                        <Text style={styles.amountText}>Objetivo: {formatCurrency(goal.amount)}</Text>
+                      </View>
+                    )}
+                    {goal.presupuesto && (
+                      <View style={styles.budgetBadge}>
+                        <Feather name="briefcase" size={12} color={appTheme.colors.primary} />
+                        <Text style={styles.budgetName}>
+                          {goal.presupuesto.name}: {formatCurrency(goal.presupuesto.presupuesto)}
+                        </Text>
+                      </View>
+                    )}
+                    {goal.card && (
+                      <View style={styles.budgetBadge}>
+                        <Feather name="credit-card" size={12} color={appTheme.colors.primary} />
+                        <Text style={styles.budgetName}>
+                          Tarjeta **** {goal.card.number?.slice(-4)}
+                        </Text>
+                      </View>
+                    )}
                         </View>
                     )}
 
@@ -193,6 +223,38 @@ const styles = StyleSheet.create({
         color: appTheme.colors.textSecondary,
         marginBottom: 8,
     },
+    typeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginBottom: 6,
+    },
+    typeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        textTransform: 'capitalize',
+    },
+    amountBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginBottom: 6,
+    },
+    amountText: {
+        fontSize: 12,
+        color: appTheme.colors.primary,
+        fontWeight: '600',
+    },
     budgetBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -202,6 +264,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 6,
+        marginBottom: 6,
     },
     budgetName: {
         fontSize: 12,

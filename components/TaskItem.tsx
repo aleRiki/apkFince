@@ -1,4 +1,4 @@
-import { appTheme } from '@/constants/appTheme';
+import { appTheme, formatCurrency } from '@/constants/appTheme';
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -14,24 +14,30 @@ export interface Task {
     id: string;
     title: string;
     description: string;
+    type: string;
     isCompleted: boolean;
+    spentAmount: number;
+    presupuesto: {
+        id: number;
+        name: string;
+        presupuesto: number;
+    };
     createdAt?: string;
-    collaboratorCount?: number; // Count from list view
+    users: any[];
 }
 
 interface TaskItemProps {
     task: Task;
     onToggleComplete: (id: string) => void;
     onShare: (task: Task) => void;
-    onPress?: (id: string) => void; // New: callback to open detail
+    onPress?: (id: string) => void;
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
-    shopping: { label: 'Compras', icon: 'shopping-cart', color: '#10B981' },
-    bills: { label: 'Pagos/Servicios', icon: 'file-text', color: '#F59E0B' },
-    personal: { label: 'Personal', icon: 'user', color: '#8B5CF6' },
-    home: { label: 'Hogar', icon: 'home', color: '#3B82F6' },
-    other: { label: 'Otro', icon: 'more-horizontal', color: '#6B7280' },
+const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+    'compras': { label: 'Compras', icon: 'shopping-cart', color: '#10B981' },
+    'pagos de servicios': { label: 'Pagos/Servicios', icon: 'file-text', color: '#F59E0B' },
+    'personal': { label: 'Personal', icon: 'user', color: '#8B5CF6' },
+    'hogar': { label: 'Hogar', icon: 'home', color: '#3B82F6' },
 };
 
 export const TaskItem: React.FC<TaskItemProps> = ({
@@ -40,13 +46,12 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     onShare,
     onPress,
 }) => {
-    // Backend returns 'description' which holds the category key
-    const categoryConfig = CATEGORY_CONFIG[task.description] || CATEGORY_CONFIG.other;
+    const typeConfig = TYPE_CONFIG[task.type?.toLowerCase()] || { label: task.type || 'Otro', icon: 'more-horizontal', color: '#6B7280' };
 
     const handleShare = async () => {
         try {
             const result = await Share.share({
-                message: `📋 Tarea: ${task.title}\n📁 Categoría: ${categoryConfig.label}\n${task.isCompleted ? '✅ Completada' : '⏳ Pendiente'}`,
+                message: `📋 Tarea: ${task.title}\n📁 Tipo: ${typeConfig.label}\n💰 Presupuesto: ${task.presupuesto?.name || 'N/A'}\n${task.isCompleted ? '✅ Completada' : '⏳ Pendiente'}`,
                 title: 'Compartir Tarea',
             });
 
@@ -68,7 +73,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 style={styles.checkbox}
                 onPress={(e) => {
                     e.stopPropagation();
-                    onToggleComplete(task.id);
+                    if (!task.isCompleted) {
+                        onToggleComplete(task.id);
+                    }
                 }}
                 activeOpacity={0.7}
             >
@@ -87,38 +94,53 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                     <Text style={[
                         styles.title,
                         task.isCompleted && styles.titleCompleted
-                    ]}>
+                    ]} numberOfLines={2}>
                         {task.title}
                     </Text>
                 </View>
 
                 <View style={styles.footer}>
-                    <View style={[styles.categoryBadge, { backgroundColor: `${categoryConfig.color}20` }]}>
-                        <Feather name={categoryConfig.icon as any} size={12} color={categoryConfig.color} />
-                        <Text style={[styles.categoryText, { color: categoryConfig.color }]}>
-                            {categoryConfig.label}
+                    <View style={[styles.typeBadge, { backgroundColor: `${typeConfig.color}20` }]}>
+                        <Feather name={typeConfig.icon as any} size={12} color={typeConfig.color} />
+                        <Text style={[styles.typeText, { color: typeConfig.color }]}>
+                            {typeConfig.label}
                         </Text>
                     </View>
 
-                    {task.collaboratorCount !== undefined && task.collaboratorCount > 0 && (
+                    {task.presupuesto && (
+                        <View style={styles.budgetBadge}>
+                            <Feather name="briefcase" size={12} color={appTheme.colors.primary} />
+                            <Text style={styles.budgetText}>{task.presupuesto.name}</Text>
+                        </View>
+                    )}
+
+                    {task.isCompleted && task.spentAmount > 0 && (
+                        <View style={styles.spentBadge}>
+                            <Text style={styles.spentText}>{formatCurrency(task.spentAmount)}</Text>
+                        </View>
+                    )}
+
+                    {task.users && task.users.length > 1 && (
                         <View style={styles.collaboratorBadge}>
                             <Feather name="users" size={12} color={appTheme.colors.primary} />
-                            <Text style={styles.collaboratorCount}>{task.collaboratorCount}</Text>
+                            <Text style={styles.collaboratorCount}>{task.users.length}</Text>
                         </View>
                     )}
                 </View>
             </View>
 
-            <TouchableOpacity
-                style={styles.shareButton}
-                onPress={(e) => {
-                    e.stopPropagation();
-                    handleShare();
-                }}
-                activeOpacity={0.7}
-            >
-                <Feather name="share-2" size={18} color={appTheme.colors.primary} />
-            </TouchableOpacity>
+            {!task.isCompleted && (
+                <TouchableOpacity
+                    style={styles.shareButton}
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        handleShare();
+                    }}
+                    activeOpacity={0.7}
+                >
+                    <Feather name="share-2" size={18} color={appTheme.colors.primary} />
+                </TouchableOpacity>
+            )}
         </TouchableOpacity>
     );
 };
@@ -174,9 +196,10 @@ const styles = StyleSheet.create({
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
+        flexWrap: 'wrap',
     },
-    categoryBadge: {
+    typeBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
@@ -184,9 +207,34 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 8,
     },
-    categoryText: {
+    typeText: {
         fontSize: 12,
         fontWeight: '600',
+    },
+    budgetBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: 'rgba(14, 165, 164, 0.1)',
+    },
+    budgetText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: appTheme.colors.primary,
+    },
+    spentBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    spentText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: appTheme.colors.error,
     },
     shareButton: {
         padding: 8,
